@@ -71,6 +71,9 @@ def main(args):
             # Load the model
             input_map = {'image_batch': image_batch, 'label_batch': label_batch, 'phase_train': phase_train_placeholder}
             facenet.load_model(args.model, input_map=input_map)
+            
+            #sess.run(tf.global_variables_initializer(), feed_dict={phase_train_placeholder:False})
+            #sess.run(tf.local_variables_initializer(), feed_dict={phase_train_placeholder:False})
 
             # Get output tensor
             embeddings = tf.get_default_graph().get_tensor_by_name("embeddings:0")
@@ -141,11 +144,11 @@ def parse_arguments(argv):
     parser.add_argument('lfw_dir', type=str,
         help='Path to the data directory containing aligned LFW face patches.')
     parser.add_argument('--lfw_batch_size', type=int,
-        help='Number of images to process in a batch in the LFW test set.', default=100)
+        help='Number of images to process in a batch in the LFW test set.', default=30)
     parser.add_argument('model', type=str, 
         help='Could be either a directory containing the meta_file and ckpt_file or a model protobuf (.pb) file')
     parser.add_argument('--image_size', type=int,
-        help='Image size (height, width) in pixels.', default=160)
+        help='Image size (height, width) in pixels.', default=224)
     parser.add_argument('--lfw_pairs', type=str,
         help='The file containing the pairs to use for validation.', default='data/pairs.txt')
     parser.add_argument('--lfw_nrof_folds', type=int,

@@ -41,7 +41,19 @@ from tensorflow.python.platform import gfile
 import math
 from six import iteritems
 
-def triplet_loss(anchor, positive, negative, alpha):
+import adabound
+
+def orig_triplet_loss(anchor, positive, negative, alpha):
+    with tf.variable_scope('triplet_loss'):
+        pos_dist = tf.reduce_sum(tf.square(tf.subtract(anchor, positive)), 1)
+        neg_dist = tf.reduce_sum(tf.square(tf.subtract(anchor, negative)), 1)
+        basic_loss = tf.add(tf.subtract(pos_dist, neg_dist), alpha)
+
+        loss = tf.reduce_mean(tf.maximum(basic_loss, 0.0), 0)
+
+    return loss
+
+def triplet_loss(anchor, positive, negative, alpha, fraction=2.0, epsilon=1e-12, subadditivity=True):
     """Calculate the triplet loss according to the FaceNet paper
     
     Args:
@@ -52,12 +64,32 @@ def triplet_loss(anchor, positive, negative, alpha):
     Returns:
       the triplet loss according to the FaceNet paper as a float tensor.
     """
+
     with tf.variable_scope('triplet_loss'):
-        pos_dist = tf.reduce_sum(tf.square(tf.subtract(anchor, positive)), 1)
-        neg_dist = tf.reduce_sum(tf.square(tf.subtract(anchor, negative)), 1)
+        if fraction == 2.0:
+            pos_dist = tf.reduce_sum(tf.square(tf.subtract(anchor, positive)), 1)
+            neg_dist = tf.reduce_sum(tf.square(tf.subtract(anchor, negative)), 1)
+
+            #pos_dist = tf.multiply(pos_dist, wpos)
+            #neg_dist = tf.multiply(neg_dist, wneg)
+
+            basic_loss = tf.add(tf.subtract(pos_dist, neg_dist), alpha)
+
+            loss = tf.reduce_mean(tf.maximum(basic_loss, 0.0), 0)
+
+        else:
+            if fraction != 0:
+                if subadditivity is True:
+                    pos_dist = tf.reduce_sum(tf.pow(tf.add(tf.abs(tf.subtract(anchor, positive)), epsilon), fraction), 1)
+                    neg_dist = tf.reduce_sum(tf.pow(tf.add(tf.abs(tf.subtract(anchor, negative)), epsilon), fraction), 1)
+                else:
+                    pos_dist = tf.pow(tf.reduce_sum(tf.pow(tf.add(tf.abs(tf.subtract(anchor, positive)), epsilon), fraction), 1), (1.0/fraction))
+                    neg_dist = tf.pow(tf.reduce_sum(tf.pow(tf.add(tf.abs(tf.subtract(anchor, negative)), epsilon), fraction), 1), (1.0/fraction)) 
         
-        basic_loss = tf.add(tf.subtract(pos_dist,neg_dist), alpha)
-        loss = tf.reduce_mean(tf.maximum(basic_loss, 0.0), 0)
+                basic_loss = tf.add(tf.subtract(pos_dist,neg_dist), alpha)
+                loss = tf.reduce_mean(tf.maximum(basic_loss, 0.0), 0)
+            else:
+                loss = None
       
     return loss
   
@@ -165,9 +197,11 @@ def _add_loss_summaries(total_loss):
   
     return loss_averages_op
 
-def train(total_loss, global_step, optimizer, learning_rate, moving_average_decay, update_gradient_vars, log_histograms=True):
+def train(total_loss, global_step, optimizer, learning_rate, moving_average_decay, update_gradient_vars, log_histograms=True, weight_decay=1e-5,
+          final_lr=0.05):
     # Generate moving averages of all losses and associated summaries.
     loss_averages_op = _add_loss_summaries(total_loss)
+    update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
 
     # Compute gradients.
     with tf.control_dependencies([loss_averages_op]):
@@ -178,13 +212,21 @@ def train(total_loss, global_step, optimizer, learning_rate, moving_average_deca
         elif optimizer=='ADAM':
             opt = tf.train.AdamOptimizer(learning_rate, beta1=0.9, beta2=0.999, epsilon=0.1)
         elif optimizer=='RMSPROP':
-            opt = tf.train.RMSPropOptimizer(learning_rate, decay=0.9, momentum=0.9, epsilon=1.0)
+            RMSPropW = tf.contrib.opt.extend_with_decoupled_weight_decay(tf.train.RMSPropOptimizer) #(learning_rate, decay=0.9, momentum=0.9, epsilon=1.0)
+            opt = RMSPropW(weight_decay=weight_decay, learning_rate=learning_rate, decay=0.9, momentum=0.9, epsilon=0.001)
         elif optimizer=='MOM':
             opt = tf.train.MomentumOptimizer(learning_rate, 0.9, use_nesterov=True)
+        elif optimizer=='MOMW':
+            opt = tf.contrib.opt.MomentumWOptimizer(weight_decay=weight_decay, learning_rate=learning_rate, momentum=0.9, use_nesterov=True)
+        elif optimizer=='ADAMW':
+            opt = tf.contrib.opt.AdamWOptimizer(weight_decay=weight_decay, learning_rate=learning_rate, beta1=0.90, beta2=0.990, epsilon=1.0)
+        elif optimizer=='ADABOUND':
+            opt = adabound.AdaBoundOptimizer(learning_rate=learning_rate, weight_decay=weight_decay, final_lr=final_lr, epsilon=0.1)
         else:
             raise ValueError('Invalid optimization algorithm')
-    
-        grads = opt.compute_gradients(total_loss, update_gradient_vars)
+        
+        with tf.control_dependencies(update_ops):
+            grads = opt.compute_gradients(total_loss, update_gradient_vars)
         
     # Apply gradients.
     apply_gradient_op = opt.apply_gradients(grads, global_step=global_step)
@@ -203,7 +245,13 @@ def train(total_loss, global_step, optimizer, learning_rate, moving_average_deca
     # Track the moving averages of all trainable variables.
     variable_averages = tf.train.ExponentialMovingAverage(
         moving_average_decay, global_step)
-    variables_averages_op = variable_averages.apply(tf.trainable_variables())
+    ema_vars = tf.trainable_variables() + tf.get_collection('moving_vars')
+    for v in tf.global_variables():
+        # We maintain mva for batch norm moving mean and variance as well.
+        if 'moving_mean' in v.name or 'moving_variance' in v.name:
+            ema_vars.append(v)
+    ema_vars = list(set(ema_vars))
+    variables_averages_op = variable_averages.apply(ema_vars)
   
     with tf.control_dependencies([apply_gradient_op, variables_averages_op]):
         train_op = tf.no_op(name='train')
@@ -405,11 +453,14 @@ def get_model_filenames(model_dir):
                 ckpt_file = step_str.groups()[0]
     return meta_file, ckpt_file
   
-def distance(embeddings1, embeddings2, distance_metric=0):
+def distance(embeddings1, embeddings2, distance_metric=0, fraction=2.0):
     if distance_metric==0:
         # Euclidian distance
         diff = np.subtract(embeddings1, embeddings2)
-        dist = np.sum(np.square(diff),1)
+        if fraction != 2.0:
+            dist = np.sum(np.power(np.abs(diff), fraction), 1)
+        else:
+            dist = np.sum(np.square(diff),1)
     elif distance_metric==1:
         # Distance based on cosine similarity
         dot = np.sum(np.multiply(embeddings1, embeddings2), axis=1)
@@ -421,7 +472,7 @@ def distance(embeddings1, embeddings2, distance_metric=0):
         
     return dist
 
-def calculate_roc(thresholds, embeddings1, embeddings2, actual_issame, nrof_folds=10, distance_metric=0, subtract_mean=False):
+def calculate_roc(thresholds, embeddings1, embeddings2, actual_issame, nrof_folds=10, distance_metric=0, subtract_mean=False, fraction=2.0):
     assert(embeddings1.shape[0] == embeddings2.shape[0])
     assert(embeddings1.shape[1] == embeddings2.shape[1])
     nrof_pairs = min(len(actual_issame), embeddings1.shape[0])
@@ -439,7 +490,7 @@ def calculate_roc(thresholds, embeddings1, embeddings2, actual_issame, nrof_fold
             mean = np.mean(np.concatenate([embeddings1[train_set], embeddings2[train_set]]), axis=0)
         else:
           mean = 0.0
-        dist = distance(embeddings1-mean, embeddings2-mean, distance_metric)
+        dist = distance(embeddings1-mean, embeddings2-mean, distance_metric, fraction)
         
         # Find the best threshold for the fold
         acc_train = np.zeros((nrof_thresholds))
@@ -468,7 +519,7 @@ def calculate_accuracy(threshold, dist, actual_issame):
 
 
   
-def calculate_val(thresholds, embeddings1, embeddings2, actual_issame, far_target, nrof_folds=10, distance_metric=0, subtract_mean=False):
+def calculate_val(thresholds, embeddings1, embeddings2, actual_issame, far_target, nrof_folds=10, distance_metric=0, subtract_mean=False, fraction=2):
     assert(embeddings1.shape[0] == embeddings2.shape[0])
     assert(embeddings1.shape[1] == embeddings2.shape[1])
     nrof_pairs = min(len(actual_issame), embeddings1.shape[0])
@@ -485,7 +536,7 @@ def calculate_val(thresholds, embeddings1, embeddings2, actual_issame, far_targe
             mean = np.mean(np.concatenate([embeddings1[train_set], embeddings2[train_set]]), axis=0)
         else:
           mean = 0.0
-        dist = distance(embeddings1-mean, embeddings2-mean, distance_metric)
+        dist = distance(embeddings1-mean, embeddings2-mean, distance_metric, fraction)
       
         # Find the threshold that gives FAR = far_target
         far_train = np.zeros(nrof_thresholds)

@@ -39,7 +39,6 @@ import itertools
 import argparse
 import facenet
 import lfw
-#from numba import jit
 
 from tensorflow.python.framework import ops
 from tensorflow.python.ops import data_flow_ops, math_ops
@@ -48,8 +47,11 @@ from six.moves import xrange  # @UnresolvedImport
 
 import cyclic_learning_rate as clr
 
-def lk_normalize(x, axis=None, fraction=2.0, name=None, epsilon=1e-12):
-    return tf.divide(x, tf.reshape(tf.maximum(tf.norm(x, axis=1, ord=fraction), epsilon), (-1, 1)), name=name)
+lr_list = list()
+loss_list = list()
+
+def lk_normalize(x, axis=None, fraction=2.0, name=None):
+    return tf.divide(x, tf.reshape(tf.norm(x, axis=1, ord=fraction), (-1, 1)), name=name)
 
 
 def main(args):
@@ -114,14 +116,12 @@ def main(args):
             images = []
             for filename in tf.unstack(filenames):
                 file_contents = tf.read_file(filename)
-                image = tf.image.decode_jpeg(file_contents, channels=3)
-
-                image = tf.image.resize_images(image, [args.image_size+22, args.image_size+22])
-
+                image = tf.image.decode_image(file_contents, channels=3)
+                
                 if args.random_crop:
                     image = tf.random_crop(image, [args.image_size, args.image_size, 3])
                 else:
-                    image = tf.image.resize_images(image, [args.image_size, args.image_size])
+                    image = tf.image.resize_image_with_crop_or_pad(image, args.image_size, args.image_size)
                 if args.random_flip:
                     image = tf.image.random_flip_left_right(image)
     
@@ -140,8 +140,7 @@ def main(args):
         labels_batch = tf.identity(labels_batch, 'label_batch')
 
         # Build the inference graph
-        if args.optimizer == 'MOMW' or args.optimizer == 'ADAMW' or args.optimizer == 'ADABOUND':
-            print("\nNot using L2 regularization\n")
+        if args.optimizer == 'MOMW' or args.optimizer == 'ADAMW':
             prelogits, _ = network.inference(image_batch, args.keep_probability, 
                 phase_train=phase_train_placeholder, bottleneck_layer_size=args.embedding_size,
                 weight_decay=0.0)
@@ -149,10 +148,9 @@ def main(args):
             prelogits, _ = network.inference(image_batch, args.keep_probability, 
                 phase_train=phase_train_placeholder, bottleneck_layer_size=args.embedding_size,
                 weight_decay=args.weight_decay)
-        if args.fraction != 2.0:
-            print("\n Using fractional distance metric\n")
-            #embeddings = lk_normalize(prelogits, axis=1, fraction=args.fraction, name='embeddings')
-            embeddings = tf.identity(prelogits, name='embeddings')
+        
+        if args.fraction != 2:
+            embeddings = lk_normalize(prelogits, axis=1, fraction=args.fraction, name='embeddings')
         else:
             embeddings = tf.nn.l2_normalize(prelogits, 1, 1e-10, name='embeddings')
         # Split embeddings into anchor, positive and negative and calculate triplet loss
@@ -162,11 +160,9 @@ def main(args):
         
         # USING CYCLICAL LEARNING RATE
         if args.max_lr != 0:
-            print("\nUsing cyclic learning rate\n")
             learning_rate = clr.cyclic_learning_rate(global_step, learning_rate_placeholder, max_lr=args.max_lr,
                                                  step_size=args.cycle_size, mode=args.cycle_policy)
         else:
-            print("\nUsing exponentially decaying learning rate\n")
             learning_rate = tf.train.exponential_decay(learning_rate_placeholder, global_step,
                                                  args.learning_rate_decay_epochs*args.epoch_size,
                                                  args.learning_rate_decay_factor, staircase=True)
@@ -181,7 +177,7 @@ def main(args):
             learning_rate, args.moving_average_decay, tf.global_variables(), weight_decay=args.weight_decay)
         
         # Create a saver
-        saver = tf.train.Saver(tf.global_variables(), max_to_keep=3)
+        saver = tf.train.Saver(tf.trainable_variables(), max_to_keep=3)
 
         # Build the summary operation based on the TF collection of Summaries.
         summary_op = tf.summary.merge_all()
@@ -252,7 +248,7 @@ def train(args, sess, dataset, epoch, image_paths_placeholder, labels_placeholde
         for i in range(nrof_batches):
             batch_size = min(nrof_examples-i*args.batch_size, args.batch_size)
             emb, lab = sess.run([embeddings, labels_batch], feed_dict={batch_size_placeholder: batch_size, 
-                learning_rate_placeholder: lr, phase_train_placeholder: False}) # phase_train_placeholder was originally True, made it False so that consistent triplets are selected
+                learning_rate_placeholder: lr, phase_train_placeholder: True})
             #emb_array[lab,:] = tf.add(tf.add(emb, b1), b2)
             emb_array[lab, :] = emb
             #print(emb.shape)
@@ -261,7 +257,7 @@ def train(args, sess, dataset, epoch, image_paths_placeholder, labels_placeholde
         # Select triplets based on the embeddings
         print('Selecting suitable triplets for training')
         triplets, nrof_random_negs, nrof_triplets = select_triplets(emb_array, num_per_class, 
-            image_paths, args.people_per_batch, args.alpha, args.fraction)
+            image_paths, args.people_per_batch, args.alpha*2.0, args.fraction)
         selection_time = time.time() - start_time
         print('(nrof_random_negs, nrof_triplets) = (%d, %d): time=%.3f seconds' % 
             (nrof_random_negs, nrof_triplets, selection_time))
@@ -293,6 +289,8 @@ def train(args, sess, dataset, epoch, image_paths_placeholder, labels_placeholde
                   (epoch, batch_number+1, args.epoch_size, duration, err, lr_temp[0], np.sum(rl[0])))
             batch_number += 1
             i += 1
+            lr_list.append(lr_temp[0])
+            loss_list.append(err)
             train_time += duration
             summary.value.add(tag='loss', simple_value=err)
             
@@ -302,7 +300,7 @@ def train(args, sess, dataset, epoch, image_paths_placeholder, labels_placeholde
         summary_writer.add_summary(summary, step)
     return step
   
-def select_triplets(embeddings, nrof_images_per_class, image_paths, people_per_batch, alpha, fraction, subadditivity=True):
+def select_triplets(embeddings, nrof_images_per_class, image_paths, people_per_batch, alpha, fraction):
     """ Select the triplets for training
     """
     trip_idx = 0
@@ -324,19 +322,13 @@ def select_triplets(embeddings, nrof_images_per_class, image_paths, people_per_b
             if fraction == 2:
                 neg_dists_sqr = np.sum(np.square(embeddings[a_idx] - embeddings), 1)
             else:
-                if subadditivity is True:
-                    neg_dists_sqr = np.sum(np.power(np.abs(embeddings[a_idx] - embeddings), fraction), 1)
-                else:
-                    neg_dists_sqr = np.power(np.sum(np.power(np.abs(embeddings[a_idx] - embeddings), fraction), 1), (1.0/fraction))
+                neg_dists_sqr = np.power(np.sum(np.power(np.abs(embeddings[a_idx] - embeddings), fraction), 1), (1.0/fraction))
             for pair in xrange(j, nrof_images): # For every possible positive pair.
                 p_idx = emb_start_idx + pair
                 if fraction == 2:
                     pos_dist_sqr = np.sum(np.square(embeddings[a_idx]-embeddings[p_idx]))
                 else:
-                    if subadditivity is True:
-                        pos_dist_sqr = np.sum(np.power(np.abs(embeddings[a_idx] - embeddings[p_idx]), fraction))
-                    else:
-                        pos_dist_sqr = np.power(np.sum(np.power(np.abs(embeddings[a_idx] - embeddings[p_idx]), fraction)), (1.0/fraction))
+                    pos_dist_sqr = np.power(np.sum(np.power(np.abs(embeddings[a_idx] - embeddings[p_idx]), fraction)), (1.0/fraction))
                 neg_dists_sqr[emb_start_idx:emb_start_idx+nrof_images] = np.NaN
                 all_neg = np.where(np.logical_and(neg_dists_sqr-pos_dist_sqr<alpha, pos_dist_sqr<neg_dists_sqr))[0]  # FaceNet selection
                 #all_neg = np.where(neg_dists_sqr-pos_dist_sqr<alpha)[0] # VGG Face selecction
@@ -507,7 +499,7 @@ def parse_arguments(argv):
         help='Keep probability of dropout for the fully connected layer(s).', default=1.0)
     parser.add_argument('--weight_decay', type=float,
         help='L2 weight regularization.', default=0.0)
-    parser.add_argument('--optimizer', type=str, choices=['ADAGRAD', 'ADADELTA', 'ADAM', 'RMSPROP', 'MOM', 'MOMW', 'ADAMW', 'ADABOUND'],
+    parser.add_argument('--optimizer', type=str, choices=['ADAGRAD', 'ADADELTA', 'ADAM', 'RMSPROP', 'MOM', 'MOMW', 'ADAMW'],
         help='The optimization algorithm to use', default='ADAGRAD')
     parser.add_argument('--learning_rate', type=float,
         help='Initial learning rate. If set to a negative value a learning rate ' +
@@ -521,7 +513,7 @@ def parse_arguments(argv):
     parser.add_argument('--moving_average_decay', type=float,
         help='Exponential decay for tracking of training parameters.', default=0.9999)
     parser.add_argument('--seed', type=int,
-        help='Random seed.', default=666)
+        help='Random seed.', default=501)
     parser.add_argument('--cycle_size', type=int,
         help='Size of cycle for CLR', default=30000)
     parser.add_argument('--cycle_policy', type=str,
@@ -542,4 +534,8 @@ def parse_arguments(argv):
 if __name__ == '__main__':
     main(parse_arguments(sys.argv[1:]))
     # When running on a GCloud VM, power off once training is complete
+    import pickle
+    with open('clr_mom_results_1e_3.pkl', 'wb') as file:
+        data = {'X':lr_list, 'Y':loss_list}
+        pickle.dump(data, file)
     os.system("sudo poweroff")
