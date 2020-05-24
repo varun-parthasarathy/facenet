@@ -197,13 +197,13 @@ def get_optimizer(optimizer_name, lr_schedule, weight_decay=1e-6):
 
 def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, init_lr, max_lr, weight_decay,/
     optimizer, model_type, embedding_size, cache_path=None, num_epochs, margin=0.35,/
-    checkpoint_path, range_test=False, use_tpu=False, tpu_name=None, lfw_path=''):
+    checkpoint_path, range_test=False, use_tpu=False, tpu_name=None, test_path=''):
 
     train_dataset, n_imgs = generate_training_dataset(data_path, image_size, batch_size, crop_size, cache_path)
 
-    if len(lfw_path) > 1:
-        test_dataset, _ = generate_training_dataset(lfw_path, image_size, batch_size, crop_size, 
-                                                    cache='./lfw_cache.tfcache')
+    if len(test_path) > 1:
+        test_dataset, _ = generate_training_dataset(test_path, image_size, batch_size, crop_size, 
+                                                    cache='./test_dataset_cache.tfcache')
     else:
         test_dataset = None
 
@@ -327,8 +327,8 @@ if __name__ == '__main__':
                         help='Whether to use a TPU for training. Default is no')
     parser.add_argument('--tpu_name', required=False, type=str,
                         help='If using a TPU, specify the TPU name')
-    parser.add_argument('--lfw_path', required=False, type=str,
-                        help='Path to LFW dataset, if you want to check validation loss. Optional but recommended')
+    parser.add_argument('--test_path', required=False, type=str,
+                        help='Path to test dataset, if you want to check validation loss. Optional but recommended')
 
     args = vars(parser.parse_args())
 
@@ -350,4 +350,4 @@ if __name__ == '__main__':
                 range_test=args['range_test'],
                 use_tpu=args['use_tpu'],
                 tpu_name=args['tpu_name'],
-                lfw_path=args['lfw_path'])
+                test_path=args['test_path'])
