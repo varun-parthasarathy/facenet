@@ -50,7 +50,7 @@ class RangeTestCallback(tf.keras.callbacks.Callback):
     tf.keras.backend.set_value(self.model.optimizer.lr, lr)
 
 
-def generate_training_dataset(data_path, image_size, batch_size, crop_size, cache=''):
+def generate_training_dataset(data_path, image_size, batch_size, crop_size, cache='', train_classes=0):
     data_path = pathlib.Path(data_path)
     AUTOTUNE = tf.data.experimental.AUTOTUNE
     CLASS_NAMES = [item.name for item in data_path.glob('*') if item.is_dir()]
@@ -62,7 +62,7 @@ def generate_training_dataset(data_path, image_size, batch_size, crop_size, cach
 
     def get_label(file_path):
         parts = tf.strings.split(file_path, os.path.sep)
-        return np.nonzero(parts[-2] == CLASS_NAMES)[0]
+        return np.argmax(parts[-2] == CLASS_NAMES) + train_classes
 
     def decode_img(img):
         img = tf.image.decode_jpeg(img, channels=3)
@@ -87,7 +87,7 @@ def generate_training_dataset(data_path, image_size, batch_size, crop_size, cach
     ds = ds.batch(batch_size)
     ds = ds.prefetch(batch_size * 2)
 
-    return ds, image_count
+    return ds, image_count, len(CLASS_NAMES)
 
 def create_neural_network(model_type='resnet50', embedding_size=512, input_shape=None):
     base_model = None
@@ -195,15 +195,18 @@ def get_optimizer(optimizer_name, lr_schedule, weight_decay=1e-6):
 
     return opt
 
-def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, init_lr, max_lr, weight_decay,/
-    optimizer, model_type, embedding_size, cache_path=None, num_epochs, margin=0.35,/
-    checkpoint_path, range_test=False, use_tpu=False, tpu_name=None, test_path=''):
+def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, init_lr, max_lr, weight_decay, 
+                optimizer, model_type, embedding_size, cache_path=None, num_epochs, margin=0.35, 
+                checkpoint_path, range_test=False, use_tpu=False, tpu_name=None, test_path=''):
 
-    train_dataset, n_imgs = generate_training_dataset(data_path, image_size, batch_size, crop_size, cache_path)
+    train_dataset, n_imgs, n_classes = generate_training_dataset(data_path, image_size, batch_size, 
+                                                                 crop_size, cache_path)
 
     if len(test_path) > 1:
-        test_dataset, _ = generate_training_dataset(test_path, image_size, batch_size, crop_size, 
-                                                    cache='./test_dataset_cache.tfcache')
+        test_dataset, _, _ = generate_training_dataset(test_path, image_size, batch_size, crop_size, 
+                                                       cache='./test_dataset_cache.tfcache',
+                                                       train_classes=n_classes) # To ensure validation data has
+                                                                                # different labels
     else:
         test_dataset = None
 
