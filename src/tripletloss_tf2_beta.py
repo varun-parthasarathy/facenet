@@ -18,6 +18,7 @@ from tensorflow.keras.applications.mobilenet import MobileNet
 from tensorflow.keras.applications.mobilenet_v2 import MobileNetV2
 from tensorflow.keras.applications.inception_v3 import InceptionV3
 from tensorflow.keras.applications.inception_resnet_v2 import InceptionResNetV2
+from tensorflow.keras.mixed_precision import experimental as mixed_precision
 
 
 @jit(nopython=True)
@@ -130,6 +131,7 @@ def create_neural_network(model_type='resnet50', embedding_size=512, input_shape
 
     logits = base_model.outputs
     embeddings = tf.keras.layers.Lambda(lambda x: tf.math.l2_normalize(x, axis=1))(logits)
+    embeddings = tf.keras.layers.Activation('linear', dtype='float32')(embeddings)
     model = Model(inputs=base_model.input, outputs=embeddings)
 
     if input_shape is not None:
@@ -197,7 +199,16 @@ def get_optimizer(optimizer_name, lr_schedule, weight_decay=1e-6):
 
 def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, init_lr, max_lr, weight_decay, 
                 optimizer, model_type, embedding_size, cache_path=None, num_epochs, margin=0.35, 
-                checkpoint_path, range_test=False, use_tpu=False, tpu_name=None, test_path=''):
+                checkpoint_path, range_test=False, use_tpu=False, tpu_name=None, test_path='',
+                use_mixed_precision=False):
+
+    if use_mixed_precision is True:
+        if use_tpu is True:
+            policy = mixed_precision.Policy('mixed_bfloat16')
+        else:
+            policy = mixed_precision.Policy('mixed_float16')
+        mixed_precision.set_policy(policy)
+        print("[INFO] Using mixed precision for training. This will reduce memory consumption")
 
     train_dataset, n_imgs, n_classes = generate_training_dataset(data_path, image_size, batch_size, 
                                                                  crop_size, cache_path)
@@ -332,6 +343,8 @@ if __name__ == '__main__':
                         help='If using a TPU, specify the TPU name')
     parser.add_argument('--test_path', required=False, type=str,
                         help='Path to test dataset, if you want to check validation loss. Optional but recommended')
+    parser.add_argument('--use_mixed_precision', action='store_true',
+                        help='Use mixed precision for training. Can greatly reduce memory consumption')
 
     args = vars(parser.parse_args())
 
@@ -353,4 +366,5 @@ if __name__ == '__main__':
                 range_test=args['range_test'],
                 use_tpu=args['use_tpu'],
                 tpu_name=args['tpu_name'],
-                test_path=args['test_path'])
+                test_path=args['test_path'],
+                use_mixed_precision=args['use_mixed_precision'])
