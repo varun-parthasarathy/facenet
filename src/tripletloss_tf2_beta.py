@@ -19,6 +19,7 @@ from tensorflow.keras.applications.mobilenet_v2 import MobileNetV2
 from tensorflow.keras.applications.inception_v3 import InceptionV3
 from tensorflow.keras.applications.inception_resnet_v2 import InceptionResNetV2
 from tensorflow.keras.mixed_precision import experimental as mixed_precision
+from custom_triplet_loss import CustomTripletHardLoss
 
 
 @jit(nopython=True)
@@ -51,7 +52,8 @@ class RangeTestCallback(tf.keras.callbacks.Callback):
     tf.keras.backend.set_value(self.model.optimizer.lr, lr)
 
 
-def generate_training_dataset(data_path, image_size, batch_size, crop_size, cache='', train_classes=0):
+def generate_training_dataset(data_path, image_size, batch_size, crop_size, cache='', train_classes=0,
+                              use_mixed_precision=False, images_per_person=35, people_per_sample=50):
     data_path = pathlib.Path(data_path)
     AUTOTUNE = tf.data.experimental.AUTOTUNE
     CLASS_NAMES = [item.name for item in data_path.glob('*') if item.is_dir()]
@@ -67,7 +69,10 @@ def generate_training_dataset(data_path, image_size, batch_size, crop_size, cach
 
     def decode_img(img):
         img = tf.image.decode_jpeg(img, channels=3)
-        img = tf.cast(img, tf.float32) / 255
+        if use_mixed_precision is True:
+            img = tf.cast(img, tf.float16) / 255
+        else:
+            img = tf.cast(img, tf.float32) / 255
         img = tf.image.resize(img, [image_size, image_size])
         return img
 
@@ -83,7 +88,7 @@ def generate_training_dataset(data_path, image_size, batch_size, crop_size, cach
     #ds = ds.map(random_img_crop)
     if len(cache) > 1:
         ds = ds.cache(cache)
-    ds = ds.shuffle(len(CLASS_NAMES)+1, reshuffle_each_iteration=True)
+    ds = ds.shuffle(images_per_person*people_per_sample, reshuffle_each_iteration=True)
     ds = ds.repeat()
     ds = ds.batch(batch_size)
     ds = ds.prefetch(batch_size * 2)
@@ -200,7 +205,7 @@ def get_optimizer(optimizer_name, lr_schedule, weight_decay=1e-6):
 def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, init_lr, max_lr, weight_decay, 
                 optimizer, model_type, embedding_size, cache_path=None, num_epochs, margin=0.35, 
                 checkpoint_path, range_test=False, use_tpu=False, tpu_name=None, test_path='',
-                use_mixed_precision=False):
+                use_mixed_precision=False, use_batch_hard=False, images_per_person=35, people_per_sample=50):
 
     if use_mixed_precision is True:
         if use_tpu is True:
@@ -208,20 +213,31 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
         else:
             policy = mixed_precision.Policy('mixed_float16')
         mixed_precision.set_policy(policy)
-        print("[INFO] Using mixed precision for training. This will reduce memory consumption")
+        print("[INFO] Using mixed precision for training. This will reduce memory consumption\n")
 
     train_dataset, n_imgs, n_classes = generate_training_dataset(data_path, image_size, batch_size, 
-                                                                 crop_size, cache_path)
+                                                                 crop_size, cache_path,
+                                                                 train_classes=0,
+                                                                 use_mixed_precision=use_mixed_precision,
+                                                                 images_per_person=images_per_person,
+                                                                 people_per_sample=people_per_sample)
 
     if len(test_path) > 1:
         test_dataset, _, _ = generate_training_dataset(test_path, image_size, batch_size, crop_size, 
                                                        cache='./test_dataset_cache.tfcache',
-                                                       train_classes=n_classes) # To ensure validation data has
-                                                                                # different labels
+                                                       train_classes=n_classes,
+                                                       use_mixed_precision=use_mixed_precision,
+                                                       images_per_person=10,
+                                                       people_per_sample=10)
     else:
         test_dataset = None
 
-    loss_fn = tfa.losses.TripletSemiHardLoss(margin=margin)
+    if use_batch_hard is True:
+        #loss_fn = tfa.losses.TripletHardLoss(margin=margin, soft=True)     # Use soft margin for training
+        loss_fn = CustomTripletHardLoss(margin=margin, soft=True)
+        print('[INFO] Using batch-hard strategy. Distance metric is Euclidean, not squared Euclidean')
+    else:
+        loss_fn = tfa.losses.TripletSemiHardLoss(margin=margin)
 
     if use_tpu is True:
         assert tpu_name is not None, '[ERROR] TPU name must be specified'
@@ -345,6 +361,12 @@ if __name__ == '__main__':
                         help='Path to test dataset, if you want to check validation loss. Optional but recommended')
     parser.add_argument('--use_mixed_precision', action='store_true',
                         help='Use mixed precision for training. Can greatly reduce memory consumption')
+    parser.add_argument('--use_batch_hard', action='store_true',
+                        help='Use batch-hard strategy for training. Comes from https://arxiv.org/pdf/1703.07737')
+    parser.add_argument('--images_per_person', required=False, type=int, default=35,
+                        help='Average number of images per class. Default is 35 (from MS1M cleaned + AsianCeleb)')
+    parser.add_argument('--people_per_sample', required=False, type=int, default=50,
+                        help='Number of people per sample. Helps fill buffer for shuffling the dataset properly')
 
     args = vars(parser.parse_args())
 
@@ -367,4 +389,7 @@ if __name__ == '__main__':
                 use_tpu=args['use_tpu'],
                 tpu_name=args['tpu_name'],
                 test_path=args['test_path'],
-                use_mixed_precision=args['use_mixed_precision'])
+                use_mixed_precision=args['use_mixed_precision'],
+                use_batch_hard=args['use_batch_hard'],
+                images_per_person=args['images_per_person'],
+                people_per_sample=args['people_per_sample'])
