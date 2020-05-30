@@ -225,7 +225,8 @@ def get_optimizer(optimizer_name, lr_schedule, weight_decay=1e-6):
 def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, init_lr, max_lr, weight_decay, 
                 optimizer, model_type, embedding_size, cache_path=None, num_epochs, margin=0.35, 
                 checkpoint_path, range_test=False, use_tpu=False, tpu_name=None, test_path='',
-                use_mixed_precision=False, use_batch_hard=False, images_per_person=35, people_per_sample=50):
+                use_mixed_precision=False, use_batch_hard=False, images_per_person=35, people_per_sample=50,
+                pretrained_model=''):
 
     if use_mixed_precision is True:
         if use_tpu is True:
@@ -391,6 +392,8 @@ if __name__ == '__main__':
                         help='Average number of images per class. Default is 35 (from MS1M cleaned + AsianCeleb)')
     parser.add_argument('--people_per_sample', required=False, type=int, default=50,
                         help='Number of people per sample. Helps fill buffer for shuffling the dataset properly')
+    parser.add_argument('--pretrained_model', required=False, type=str,
+                        help='Path to pretrained model OR folder containing previously trained checkpoints')
 
     args = vars(parser.parse_args())
 
@@ -416,4 +419,5 @@ if __name__ == '__main__':
                 use_mixed_precision=args['use_mixed_precision'],
                 use_batch_hard=args['use_batch_hard'],
                 images_per_person=args['images_per_person'],
-                people_per_sample=args['people_per_sample'])
+                people_per_sample=args['people_per_sample'],
+                pretrained_model=args['pretrained_model'])
