@@ -152,15 +152,12 @@ def create_neural_network(model_type='resnet50', embedding_size=512, input_shape
         try:
             model.load_weights(latest)
         except:
-            print('[ERROR] Weights loaded did not match the model architecture specified')
-            return None
-    elif len(weights_path) > 1 and os.path.exists(weights_path) and weights_path.endswith('.h5'):
-        print('[INFO] Attempting to load weights from h5 file')
-        try:
-            model.load_weights(weights_path)
-        except:
-            print('[ERROR] Weights loaded did not match the model architecture specified')
-            return None
+            try:
+                model = tf.keras.models.load_model(weights_path)
+                print('[INFO] Loading model from SavedModel format')
+            except:
+                print('[ERROR] Weights did not match the model architecture specified, or path was incorrect')
+                return None
     else:
         print('[WARNING] Could not load weights. Using random initialization instead')
 
