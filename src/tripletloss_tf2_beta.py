@@ -97,7 +97,7 @@ def generate_training_dataset(data_path, image_size, batch_size, crop_size, cach
 
     return ds, image_count, len(CLASS_NAMES)
 
-def create_neural_network(model_type='resnet50', embedding_size=512, input_shape=None):
+def create_neural_network(model_type='resnet50', embedding_size=512, input_shape=None, weights_path=''):
     base_model = None
     if model_type == 'resnet50':
         base_model = ResNet50(weights=None, classes=embedding_size, classifier_activation=None)
@@ -145,6 +145,24 @@ def create_neural_network(model_type='resnet50', embedding_size=512, input_shape
         in_shape = np.array(model.input.shape)
         in_shape = tuple(in_shape[-3:])
         assert in_shape == input_shape, '[ERROR] The model input shape and the given input shape do not match'
+
+    if len(weights_path) > 1 and os.path.exists(weights_path) and os.path.isdir(weights_path):
+        print('[INFO] Attempting to load weights from most recently saved checkpoint')
+        latest = tf.train.latest_checkpoint(weights_path)
+        try:
+            model.load_weights(latest)
+        except:
+            print('[ERROR] Weights loaded did not match the model architecture specified')
+            return None
+    elif len(weights_path) > 1 and os.path.exists(weights_path) and weights_path.endswith('.h5'):
+        print('[INFO] Attempting to load weights from h5 file')
+        try:
+            model.load_weights(weights_path)
+        except:
+            print('[ERROR] Weights loaded did not match the model architecture specified')
+            return None
+    else:
+        print('[WARNING] Could not load weights. Using random initialization instead')
 
     return model
 
@@ -258,11 +276,13 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
             with strategy.scope():
                 model = create_neural_network(model_type=model_type,
                                               embedding_size=embedding_size)
+                assert model is not None, '[ERROR] There was a problem while loading the pre-trained weights'
                 model.compile(optimizer=opt,
                               loss=loss_fn)
         else:
             model = create_neural_network(model_type=model_type,
                                           embedding_size=embedding_size)
+            assert model is not None, '[ERROR] There was a problem while loading the pre-trained weights'
             model.compile(optimizer=opt,
                           loss=loss_fn)
         train_history = model.fit(train_dataset, epochs=5, callbacks=[range_finder], validation_data=test_dataset)
@@ -295,11 +315,13 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
             with strategy.scope():
                 model = create_neural_network(model_type=model_type,
                                               embedding_size=embedding_size)
+                assert model is not None, '[ERROR] There was a problem while loading the pre-trained weights'
                 model.compile(optimizer=opt,
                               loss=loss_fn)
         else:
             model = create_neural_network(model_type=model_type,
                                           embedding_size=embedding_size)
+            assert model is not None, '[ERROR] There was a problem while loading the pre-trained weights'
             model.compile(optimizer=opt,
                           loss=loss_fn)
 
