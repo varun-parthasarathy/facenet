@@ -62,16 +62,22 @@ def _masked_minimum(data, mask, dim=1):
 
 
 @tf.function
-def triplet_semihard_loss(
-    y_true: TensorLike, y_pred: TensorLike, margin: FloatTensorLike = 1.0
+def triplet_focal_loss(
+    y_true: TensorLike,
+    y_pred: TensorLike,
+    margin: FloatTensorLike = 0.2,
+    sigma: FloatTensorLike = 0.3,
+    squared: bool = False
 ) -> tf.Tensor:
-    """Computes the triplet loss with semi-hard negative mining.
+    """Computes the triplet focal loss with hard negative and hard positive mining.
     Args:
       y_true: 1-D integer `Tensor` with shape [batch_size] of
         multiclass integer labels.
       y_pred: 2-D float `Tensor` of embedding vectors. Embeddings should
         be l2 normalized.
       margin: Float, margin term in the loss definition.
+      sigma: Float, sigma term in the loss definition.
+      squared: Boolean, if set, use squared Euclidean instead of Euclidean distance.
     """
     labels, embeddings = y_true, y_pred
     # Reshape label tensor to [batch_size, 1].
@@ -79,66 +85,37 @@ def triplet_semihard_loss(
     labels = tf.reshape(labels, [lshape[0], 1])
 
     # Build pairwise squared distance matrix.
-    pdist_matrix = metric_learning.pairwise_distance(embeddings, squared=True)
+    pdist_matrix = metric_learning.pairwise_distance(embeddings, squared=squared)
     # Build pairwise binary adjacency matrix.
     adjacency = tf.math.equal(labels, tf.transpose(labels))
     # Invert so we can select negatives only.
     adjacency_not = tf.math.logical_not(adjacency)
 
+    adjacency_not = tf.cast(adjacency_not, dtype=tf.dtypes.float32)
+    # hard negatives: smallest D_an.
+    hard_negatives = _masked_minimum(pdist_matrix, adjacency_not)
+
     batch_size = tf.size(labels)
 
-    # Compute the mask.
-    pdist_matrix_tile = tf.tile(pdist_matrix, [batch_size, 1])
-    mask = tf.math.logical_and(
-        tf.tile(adjacency_not, [batch_size, 1]),
-        tf.math.greater(
-            pdist_matrix_tile, tf.reshape(tf.transpose(pdist_matrix), [-1, 1])
-        ),
-    )
-    mask_final = tf.reshape(
-        tf.math.greater(
-            tf.math.reduce_sum(
-                tf.cast(mask, dtype=tf.dtypes.float32), 1, keepdims=True
-            ),
-            0.0,
-        ),
-        [batch_size, batch_size],
-    )
-    mask_final = tf.transpose(mask_final)
-
-    adjacency_not = tf.cast(adjacency_not, dtype=tf.dtypes.float32)
-    mask = tf.cast(mask, dtype=tf.dtypes.float32)
-
-    # negatives_outside: smallest D_an where D_an > D_ap.
-    negatives_outside = tf.reshape(
-        _masked_minimum(pdist_matrix_tile, mask), [batch_size, batch_size]
-    )
-    negatives_outside = tf.transpose(negatives_outside)
-
-    # negatives_inside: largest D_an.
-    negatives_inside = tf.tile(
-        _masked_maximum(pdist_matrix, adjacency_not), [1, batch_size]
-    )
-    semi_hard_negatives = tf.where(mask_final, negatives_outside, negatives_inside)
-
-    loss_mat = tf.math.add(margin, pdist_matrix - semi_hard_negatives)
+    adjacency = tf.cast(adjacency, dtype=tf.dtypes.float32)
 
     mask_positives = tf.cast(adjacency, dtype=tf.dtypes.float32) - tf.linalg.diag(
         tf.ones([batch_size])
     )
 
-    # In lifted-struct, the authors multiply 0.5 for upper triangular
-    #   in semihard, they take all positive pairs except the diagonal.
-    num_positives = tf.math.reduce_sum(mask_positives)
+    # hard positives: largest D_ap.
+    hard_positives = _masked_maximum(pdist_matrix, mask_positives)
 
-    triplet_loss = tf.math.truediv(
-        tf.math.reduce_sum(
-            tf.math.maximum(tf.math.multiply(loss_mat, mask_positives), 0.0)
-        ),
-        num_positives,
-    )
+    p_hard = tf.math.exp(tf.math.divide(hard_positives, sigma))
+    n_hard = tf.math.exp(tf.math.divide(hard_negatives, sigma))
+
+    triplet_loss = tf.maximum(p_hard - n_hard + margin, 0.0)
+
+    # Get final mean triplet loss
+    triplet_loss = tf.reduce_mean(triplet_loss)
 
     return triplet_loss
+
 
 
 @tf.function
@@ -147,6 +124,7 @@ def triplet_hard_loss(
     y_pred: TensorLike,
     margin: FloatTensorLike = 1.0,
     soft: bool = False,
+    squared: bool = False
 ) -> tf.Tensor:
     """Computes the triplet loss with hard negative and hard positive mining.
     Args:
@@ -156,6 +134,7 @@ def triplet_hard_loss(
         be l2 normalized.
       margin: Float, margin term in the loss definition.
       soft: Boolean, if set, use the soft margin version.
+      squared: Boolean, if set, use squared Euclidean instead of Euclidean distance.
     """
     labels, embeddings = y_true, y_pred
     # Reshape label tensor to [batch_size, 1].
@@ -163,7 +142,7 @@ def triplet_hard_loss(
     labels = tf.reshape(labels, [lshape[0], 1])
 
     # Build pairwise squared distance matrix.
-    pdist_matrix = metric_learning.pairwise_distance(embeddings, squared=False)
+    pdist_matrix = metric_learning.pairwise_distance(embeddings, squared=squared)
     # Build pairwise binary adjacency matrix.
     adjacency = tf.math.equal(labels, tf.transpose(labels))
     # Invert so we can select negatives only.
@@ -197,31 +176,38 @@ def triplet_hard_loss(
     return triplet_loss
 
 
-class TripletSemiHardLoss(tf.keras.losses.Loss):
-    """Computes the triplet loss with semi-hard negative mining.
+class TripletFocalLoss(tf.keras.losses.Loss):
+    """Computes the triplet loss with hard negative mining.
     The loss encourages the positive distances (between a pair of embeddings
     with the same labels) to be smaller than the minimum negative distance
     among which are at least greater than the positive distance plus the
     margin constant (called semi-hard negative) in the mini-batch.
     If no such negative exists, uses the largest negative distance instead.
-    See: https://arxiv.org/abs/1503.03832.
+    See: https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=8558553.
     We expect labels `y_true` to be provided as 1-D integer `Tensor` with shape
     [batch_size] of multi-class integer labels. And embeddings `y_pred` must be
     2-D float `Tensor` of l2 normalized embedding vectors.
     Args:
       margin: Float, margin term in the loss definition. Default value is 1.0.
+      sigma: Float, sigma term in the loss definition.
+      squared: Boolean, if set, use squared Euclidean instead of Euclidean distance
       name: Optional name for the op.
     """
 
     @typechecked
     def __init__(
-        self, margin: FloatTensorLike = 1.0, name: Optional[str] = None, **kwargs
+        self, margin: FloatTensorLike = 1.0, 
+        sigma: FloatTensorLike = 0.3,
+        squared: bool = False,
+        name: Optional[str] = None, **kwargs
     ):
         super().__init__(name=name, reduction=tf.keras.losses.Reduction.NONE)
         self.margin = margin
+        self.sigma = sigma
+        self.squared = squared
 
     def call(self, y_true, y_pred):
-        return triplet_semihard_loss(y_true, y_pred, self.margin)
+        return triplet_focal_loss(y_true, y_pred, self.margin, self.sigma, self.squared)
 
     def get_config(self):
         config = {
@@ -231,7 +217,7 @@ class TripletSemiHardLoss(tf.keras.losses.Loss):
         return {**base_config, **config}
 
 
-class CustomTripletHardLoss(tf.keras.losses.Loss):
+class TripletBatchHardLoss(tf.keras.losses.Loss):
     """Computes the triplet loss with hard negative and hard positive mining.
     The loss encourages the maximum positive distance (between a pair of embeddings
     with the same labels) to be smaller than the minimum negative distance plus the
@@ -246,6 +232,7 @@ class CustomTripletHardLoss(tf.keras.losses.Loss):
       margin: Float, margin term in the loss definition. Default value is 1.0.
       soft: Boolean, if set, use the soft margin version. Default value is False.
       name: Optional name for the op.
+      squared: Boolean, if set, use squared Euclidean instead of Euclidean distance
     """
 
     @typechecked
@@ -253,15 +240,17 @@ class CustomTripletHardLoss(tf.keras.losses.Loss):
         self,
         margin: FloatTensorLike = 1.0,
         soft: bool = False,
+        squared: bool = False,
         name: Optional[str] = None,
         **kwargs
     ):
         super().__init__(name=name, reduction=tf.keras.losses.Reduction.NONE)
         self.margin = margin
         self.soft = soft
+        self.squared = squared
 
     def call(self, y_true, y_pred):
-        return triplet_hard_loss(y_true, y_pred, self.margin, self.soft)
+        return triplet_hard_loss(y_true, y_pred, self.margin, self.soft, self.squared)
 
     def get_config(self):
         config = {

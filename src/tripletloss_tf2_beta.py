@@ -19,7 +19,7 @@ from tensorflow.keras.applications.mobilenet_v2 import MobileNetV2
 from tensorflow.keras.applications.inception_v3 import InceptionV3
 from tensorflow.keras.applications.inception_resnet_v2 import InceptionResNetV2
 from tensorflow.keras.mixed_precision import experimental as mixed_precision
-from custom_triplet_loss import CustomTripletHardLoss
+from custom_triplet_loss import TripletBatchHardLoss, TripletFocalLoss
 
 
 @jit(nopython=True)
@@ -222,8 +222,8 @@ def get_optimizer(optimizer_name, lr_schedule, weight_decay=1e-6):
 def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, init_lr, max_lr, weight_decay, 
                 optimizer, model_type, embedding_size, cache_path=None, num_epochs, margin=0.35, 
                 checkpoint_path, range_test=False, use_tpu=False, tpu_name=None, test_path='',
-                use_mixed_precision=False, use_batch_hard=False, images_per_person=35, people_per_sample=50,
-                pretrained_model=''):
+                use_mixed_precision=False, triplet_strategy='', images_per_person=35, 
+                people_per_sample=50, pretrained_model='', squared=False, soft=True, sigma=0.3):
 
     if use_mixed_precision is True:
         if use_tpu is True:
@@ -250,12 +250,20 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
     else:
         test_dataset = None
 
-    if use_batch_hard is True:
-        #loss_fn = tfa.losses.TripletHardLoss(margin=margin, soft=True)     # Use soft margin for training
-        loss_fn = CustomTripletHardLoss(margin=margin, soft=True)
-        print('[INFO] Using batch-hard strategy. Distance metric is Euclidean, not squared Euclidean')
-    else:
+    if triplet_strategy == 'VANILLA':
         loss_fn = tfa.losses.TripletSemiHardLoss(margin=margin)
+        print('[INFO] Using vanilla triplet loss')
+    elif triplet_strategy == 'BATCH_HARD':
+        loss_fn = TripletBatchHardLoss(margin=margin,
+                                       soft=soft,
+                                       squared=squared)
+        print('[INFO] Using batch-hard strategy.')
+    else:
+        loss_fn = TripletFocalLoss(margin=margin,
+                                   sigma=sigma,
+                                   squared=squared)
+        print('[INFO] Using triplet focal loss.')
+        
 
     if use_tpu is True:
         assert tpu_name is not None, '[ERROR] TPU name must be specified'
@@ -383,14 +391,21 @@ if __name__ == '__main__':
                         help='Path to test dataset, if you want to check validation loss. Optional but recommended')
     parser.add_argument('--use_mixed_precision', action='store_true',
                         help='Use mixed precision for training. Can greatly reduce memory consumption')
-    parser.add_argument('--use_batch_hard', action='store_true',
-                        help='Use batch-hard strategy for training. Comes from https://arxiv.org/pdf/1703.07737')
+    parser.add_argument('--triplet_strategy', type=str, default='VANILLA',
+                        choices=['VANILLA', 'BATCH_HARD', 'FOCAL'],
+                        help='Choice of triplet loss formulation. Default is VANILLA')
     parser.add_argument('--images_per_person', required=False, type=int, default=35,
                         help='Average number of images per class. Default is 35 (from MS1M cleaned + AsianCeleb)')
     parser.add_argument('--people_per_sample', required=False, type=int, default=50,
                         help='Number of people per sample. Helps fill buffer for shuffling the dataset properly')
     parser.add_argument('--pretrained_model', required=False, type=str,
                         help='Path to pretrained model OR folder containing previously trained checkpoints')
+    parser.add_argument('--squared', action='store_true',
+                        help='Whether to use squared Euclidean distance or not')
+    parser.add_argument('--soft', action='store_true',
+                        help='Use soft margin for BATCH_HARD strategy')
+    parser.add_argument('--sigma', type=float, required=False, default=0.3,
+                        help='Value of sigma for FOCAL strategy')
 
     args = vars(parser.parse_args())
 
@@ -414,7 +429,10 @@ if __name__ == '__main__':
                 tpu_name=args['tpu_name'],
                 test_path=args['test_path'],
                 use_mixed_precision=args['use_mixed_precision'],
-                use_batch_hard=args['use_batch_hard'],
+                triplet_strategy=args['triplet_strategy'],
                 images_per_person=args['images_per_person'],
                 people_per_sample=args['people_per_sample'],
-                pretrained_model=args['pretrained_model'])
+                pretrained_model=args['pretrained_model'],
+                squared=args['squared'],
+                soft=args['soft'],
+                sigma=args['sigma'])
