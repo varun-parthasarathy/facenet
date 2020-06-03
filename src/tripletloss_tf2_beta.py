@@ -219,6 +219,14 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                 use_mixed_precision=False, triplet_strategy='', images_per_person=35, 
                 people_per_sample=50, pretrained_model='', squared=False, soft=True, sigma=0.3):
 
+    if use_tpu is True:
+        assert tpu_name is not None, '[ERROR] TPU name must be specified'
+        resolver = tf.distribute.cluster_resolver.TPUClusterResolver(tpu=tpu_name)
+        tf.config.experimental_connect_to_cluster(resolver)
+        tf.tpu.experimental.initialize_tpu_system(resolver)
+        strategy = tf.distribute.experimental.TPUStrategy(resolver)
+        print("[INFO] TPUs: ", tf.config.list_logical_devices('TPU'))
+
     if use_mixed_precision is True:
         if use_tpu is True:
             policy = mixed_precision.Policy('mixed_bfloat16')
@@ -259,14 +267,6 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                    sigma=sigma,
                                    squared=squared)
         print('[INFO] Using triplet focal loss.')
-        
-
-    if use_tpu is True:
-        assert tpu_name is not None, '[ERROR] TPU name must be specified'
-        resolver = tf.distribute.cluster_resolver.TPUClusterResolver(tpu=tpu_name)
-        tf.config.experimental_connect_to_cluster(resolver)
-        tf.tpu.experimental.initialize_tpu_system(resolver)
-        strategy = tf.distribute.experimental.TPUStrategy(resolver)
 
     if range_test is True:
         range_finder = RangeTestCallback(start_lr=1e-5,
