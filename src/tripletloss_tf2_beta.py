@@ -4,7 +4,6 @@ import keras
 import pathlib
 import argparse
 import numpy as np
-from numba import jit
 import tensorflow as tf
 from datetime import datetime
 import tensorflow_addons as tfa
@@ -21,14 +20,6 @@ from tensorflow.keras.applications.inception_v3 import InceptionV3
 from tensorflow.keras.applications.inception_resnet_v2 import InceptionResNetV2
 from tensorflow.keras.mixed_precision import experimental as mixed_precision
 from custom_triplet_loss import TripletBatchHardLoss, TripletFocalLoss
-
-
-@jit(nopython=True)
-def find_index(item, class_names):
-    for i, v in enumerate(class_names):
-        if item == v:
-            return i
-    return -1
 
 
 class RangeTestCallback(tf.keras.callbacks.Callback):
@@ -54,7 +45,7 @@ class RangeTestCallback(tf.keras.callbacks.Callback):
 
 
 def generate_training_dataset(data_path, image_size, batch_size, crop_size, cache='', train_classes=0,
-                              use_mixed_precision=False, images_per_person=35, people_per_sample=50):
+                              use_mixed_precision=False, images_per_person=35, people_per_sample=50, use_tpu=False):
     data_path = pathlib.Path(data_path)
     AUTOTUNE = tf.data.experimental.AUTOTUNE
     CLASS_NAMES = [item.name for item in data_path.glob('*') if item.is_dir()]
@@ -71,9 +62,12 @@ def generate_training_dataset(data_path, image_size, batch_size, crop_size, cach
     def decode_img(img):
         img = tf.image.decode_jpeg(img, channels=3)
         if use_mixed_precision is True:
-            img = tf.cast(img, tf.float16) / 255
+            if use_tpu is True:
+                img = tf.cast(img, tf.bfloat16) / 255.0
+            else:
+                img = tf.cast(img, tf.float16) / 255.0
         else:
-            img = tf.cast(img, tf.float32) / 255
+            img = tf.cast(img, tf.float32) / 255.0
         img = tf.image.resize(img, [image_size, image_size])
         return img
 
@@ -83,18 +77,17 @@ def generate_training_dataset(data_path, image_size, batch_size, crop_size, cach
         img = decode_img(img)
         img = tf.image.random_crop(img, [crop_size, crop_size, 3])
         img = tf.image.random_flip_left_right(img)
-        img = tf.image.random_brightness(img, 0.2)
-        img = tf.image.random_jpeg_quality(img, 70, 100)
+        img = tf.image.random_brightness(img, 0.3)
+        img = tf.image.random_jpeg_quality(img, 60, 100)
         return img, label
 
     ds = list_ds.map(process_path, num_parallel_calls=AUTOTUNE)
-    #ds = ds.map(random_img_crop)
     if len(cache) > 1:
         ds = ds.cache(cache)
     ds = ds.shuffle(images_per_person*people_per_sample, reshuffle_each_iteration=True)
     ds = ds.repeat()
     ds = ds.batch(batch_size)
-    ds = ds.prefetch(batch_size * 2)
+    ds = ds.prefetch(AUTOTUNE)
 
     return ds, image_count, len(CLASS_NAMES)
 
@@ -239,7 +232,8 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                                                  train_classes=0,
                                                                  use_mixed_precision=use_mixed_precision,
                                                                  images_per_person=images_per_person,
-                                                                 people_per_sample=people_per_sample)
+                                                                 people_per_sample=people_per_sample,
+                                                                 use_tpu=use_tpu)
 
     if len(test_path) > 1:
         test_dataset, _, _ = generate_training_dataset(test_path, image_size, batch_size, crop_size, 
@@ -247,7 +241,8 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                                        train_classes=n_classes,
                                                        use_mixed_precision=use_mixed_precision,
                                                        images_per_person=10,
-                                                       people_per_sample=10)
+                                                       people_per_sample=10,
+                                                       use_tpu=use_tpu)
     else:
         test_dataset = None
 
