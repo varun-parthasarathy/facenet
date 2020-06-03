@@ -10,6 +10,7 @@ from datetime import datetime
 import tensorflow_addons as tfa
 import matplotlib.pyplot as plt
 import cyclic_learning_rate as clr
+from scipy.signal import savgol_filter
 from tensorflow.keras.models import Model
 from tensorflow.keras.applications.resnet import *
 from tensorflow.keras.applications.efficientnet import *
@@ -292,7 +293,12 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
             model.compile(optimizer=opt,
                           loss=loss_fn)
         train_history = model.fit(train_dataset, epochs=5, callbacks=[range_finder], validation_data=test_dataset)
-        plt.plot(train_history.lrs, train_history.losses, color='red')
+        plt.xscale('log')
+        plt.plot(train_history.lrs, train_history.losses, color='blue')
+        smooth_losses = savgol_filter(train_history.losses, 5)
+        plt.plot(train_history.lrs, smooth_losses, color='red')
+        plt.xlabel('Log learning rate')
+        plt.ylabel('Loss')
         plt.savefig('./range_test_result.png')
         print('\n[INFO] Training complete. Range test results can be found at "./range_test_result.png"')
 
