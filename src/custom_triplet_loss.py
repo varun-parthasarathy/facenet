@@ -119,7 +119,7 @@ def triplet_focal_loss(
 
 
 @tf.function
-def triplet_hard_loss(
+def triplet_batch_hard_loss(
     y_true: TensorLike,
     y_pred: TensorLike,
     margin: FloatTensorLike = 1.0,
@@ -171,6 +171,63 @@ def triplet_hard_loss(
     # Get final mean triplet loss
     #zero = tf.constant(0.0, dtype=tf.dtypes.float32)
     #triplet_loss = tf.reduce_mean(tf.boolean_mask(triplet_loss, tf.math.not_equal(triplet_loss, zero)))
+    triplet_loss = tf.reduce_mean(triplet_loss)
+
+    return triplet_loss
+
+@tf.function
+def triplet_batch_hard_v2_loss(
+    y_true: TensorLike,
+    y_pred: TensorLike,
+    margin1: FloatTensorLike = -1.0,
+    margin2: FloatTensorLike = 0.01,
+    beta: FloatTensorLike = 0.002,
+    squared: bool = False
+) -> tf.Tensor:
+    """Computes the triplet loss with hard negative and hard positive mining.
+    Args:
+      y_true: 1-D integer `Tensor` with shape [batch_size] of
+        multiclass integer labels.
+      y_pred: 2-D float `Tensor` of embedding vectors. Embeddings should
+        be l2 normalized.
+      margin1: Float, margin term in the loss definition.
+      margin2: Float, margin term in the loss definition.
+      beta: Float, multiplier for intra-class constraint.
+      squared: Boolean, if set, use squared Euclidean instead of Euclidean distance.
+
+      See https://ieeexplore.ieee.org/document/7780518
+    """
+    labels, embeddings = y_true, y_pred
+    # Reshape label tensor to [batch_size, 1].
+    lshape = tf.shape(labels)
+    labels = tf.reshape(labels, [lshape[0], 1])
+
+    # Build pairwise squared distance matrix.
+    pdist_matrix = metric_learning.pairwise_distance(embeddings, squared=squared)
+    # Build pairwise binary adjacency matrix.
+    adjacency = tf.math.equal(labels, tf.transpose(labels))
+    # Invert so we can select negatives only.
+    adjacency_not = tf.math.logical_not(adjacency)
+
+    adjacency_not = tf.cast(adjacency_not, dtype=tf.dtypes.float32)
+    # hard negatives: smallest D_an.
+    hard_negatives = _masked_minimum(pdist_matrix, adjacency_not)
+
+    batch_size = tf.size(labels)
+
+    adjacency = tf.cast(adjacency, dtype=tf.dtypes.float32)
+
+    mask_positives = tf.cast(adjacency, dtype=tf.dtypes.float32) - tf.linalg.diag(
+        tf.ones([batch_size])
+    )
+
+    # hard positives: largest D_ap.
+    hard_positives = _masked_maximum(pdist_matrix, mask_positives)
+
+    triplet_loss = tf.maximum(hard_positives - hard_negatives, margin1) + tf.math.multiply(
+                                              tf.maximum(hard_positives, margin2), beta)
+
+    # Get final mean triplet loss
     triplet_loss = tf.reduce_mean(triplet_loss)
 
     return triplet_loss
@@ -250,7 +307,54 @@ class TripletBatchHardLoss(tf.keras.losses.Loss):
         self.squared = squared
 
     def call(self, y_true, y_pred):
-        return triplet_hard_loss(y_true, y_pred, self.margin, self.soft, self.squared)
+        return triplet_batch_hard_loss(y_true, y_pred, self.margin, self.soft, self.squared)
+
+    def get_config(self):
+        config = {
+            "margin": self.margin,
+            "soft": self.soft,
+        }
+        base_config = super().get_config()
+        return {**base_config, **config}
+
+
+class TripletBatchHardV2Loss(tf.keras.losses.Loss):
+    """Computes the triplet loss with hard negative and hard positive mining.
+    The loss encourages the maximum positive distance (between a pair of embeddings
+    with the same labels) to be smaller than the minimum negative distance plus the
+    margin constant in the mini-batch. Intra-class variability is enforced through
+    a second margin that places a constraint on the spread of the cluster.
+    The loss selects the hardest positive and the hardest negative samples
+    within the batch when forming the triplets for computing the loss.
+    See: https://ieeexplore.ieee.org/document/7780518.
+    We expect labels `y_true` to be provided as 1-D integer `Tensor` with shape
+    [batch_size] of multi-class integer labels. And embeddings `y_pred` must be
+    2-D float `Tensor` of l2 normalized embedding vectors.
+    Args:
+      margin: Float, margin term in the loss definition. Default value is 1.0.
+      soft: Boolean, if set, use the soft margin version. Default value is False.
+      name: Optional name for the op.
+      squared: Boolean, if set, use squared Euclidean instead of Euclidean distance
+    """
+
+    @typechecked
+    def __init__(
+        self,
+        margin1: FloatTensorLike = -1.0,
+        margin2: FloatTensorLike = 0.01,
+        beta: FloatTensorLike = 0.002,
+        squared: bool = False,
+        name: Optional[str] = None,
+        **kwargs
+    ):
+        super().__init__(name=name, reduction=tf.keras.losses.Reduction.NONE)
+        self.margin1 = margin1
+        self.margin2 = margin2
+        self.beta = beta
+        self.squared = squared
+
+    def call(self, y_true, y_pred):
+        return triplet_batch_hard_v2_loss(y_true, y_pred, self.margin1, self.margin2, self.beta, self.squared)
 
     def get_config(self):
         config = {

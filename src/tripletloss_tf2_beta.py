@@ -19,7 +19,7 @@ from tensorflow.keras.applications.mobilenet_v2 import MobileNetV2
 from tensorflow.keras.applications.inception_v3 import InceptionV3
 from tensorflow.keras.applications.inception_resnet_v2 import InceptionResNetV2
 from tensorflow.keras.mixed_precision import experimental as mixed_precision
-from custom_triplet_loss import TripletBatchHardLoss, TripletFocalLoss
+from custom_triplet_loss import TripletBatchHardLoss, TripletFocalLoss, TripletBatchHardV2Loss
 
 
 class RangeTestCallback(tf.keras.callbacks.Callback):
@@ -262,6 +262,12 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                        soft=soft,
                                        squared=squared)
         print('[INFO] Using batch-hard strategy.')
+    elif triplet_strategy == 'BATCH_HARD_V2':
+        loss_fn = TripletBatchHardV2Loss(margin1=(-1.0*margin),
+                                         margin2=(margin1/100.0),
+                                         beta=0.002,
+                                         squared=squared)
+        print('[INFO] Using batch-hard V2 strategy')
     else:
         loss_fn = TripletFocalLoss(margin=margin,
                                    sigma=sigma,
@@ -392,9 +398,9 @@ if __name__ == '__main__':
                         help='Path to test dataset, if you want to check validation loss. Optional but recommended')
     parser.add_argument('--use_mixed_precision', action='store_true',
                         help='Use mixed precision for training. Can greatly reduce memory consumption')
-    parser.add_argument('--triplet_strategy', type=str, default='VANILLA',
-                        choices=['VANILLA', 'BATCH_HARD', 'FOCAL'],
-                        help='Choice of triplet loss formulation. Default is VANILLA')
+    parser.add_argument('--triplet_strategy', type=str, default='FOCAL',
+                        choices=['VANILLA', 'BATCH_HARD', 'BATCH_HARD_V2', 'FOCAL'],
+                        help='Choice of triplet loss formulation. Default is FOCAL')
     parser.add_argument('--images_per_person', required=False, type=int, default=35,
                         help='Average number of images per class. Default is 35 (from MS1M cleaned + AsianCeleb)')
     parser.add_argument('--people_per_sample', required=False, type=int, default=50,
