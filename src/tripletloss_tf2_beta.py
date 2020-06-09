@@ -53,7 +53,7 @@ def generate_training_dataset(data_path, image_size, batch_size, crop_size, cach
     CLASS_NAMES = np.array(CLASS_NAMES)
     image_count = len(list(data_path.glob('*/*.jpg')))
 
-    list_ds = tf.data.Dataset.list_files(str(data_path/'*/*'))
+    classes_ds = tf.data.Dataset.list_files(str(data_path/'*/'))
 
     def get_label(file_path):
         parts = tf.strings.split(file_path, os.path.sep)
@@ -81,12 +81,17 @@ def generate_training_dataset(data_path, image_size, batch_size, crop_size, cach
         img = tf.image.random_jpeg_quality(img, 60, 100)
         return img, label
 
-    ds = list_ds.map(process_path, num_parallel_calls=AUTOTUNE)
+    def parse_class(class_path):
+        return tf.data.Dataset.list_files(str(class_path/'*.jpg'), shuffle=True)
+
     if len(cache) > 1:
-        ds = ds.cache(cache)
-    ds = ds.shuffle(images_per_person*people_per_sample, reshuffle_each_iteration=True)
+        classes_ds = classes_ds.cache(cache)
+    ds = classes_ds.shuffle(len(CLASS_NAMES), reshuffle_each_iteration=True)
+    ds = ds.interleave(lambda x: tf.data.Dataset(x).map(parse_class, num_parallel_calls=AUTOTUNE),
+                       cycle_length=1, block_length=images_per_person)
+    ds = ds.batch(batch_size).map(lambda x: tf.random.shuffle(x))
+    ds = ds.map(process_path, num_parallel_calls=AUTOTUNE)
     ds = ds.repeat()
-    ds = ds.batch(batch_size)
     ds = ds.prefetch(AUTOTUNE)
 
     return ds, image_count, len(CLASS_NAMES)
@@ -217,7 +222,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                 optimizer, model_type, embedding_size, cache_path=None, num_epochs, margin=0.35, 
                 checkpoint_path, range_test=False, use_tpu=False, tpu_name=None, test_path='',
                 use_mixed_precision=False, triplet_strategy='', images_per_person=35, 
-                people_per_sample=50, pretrained_model='', squared=False, soft=True, sigma=0.3):
+                people_per_sample=12, pretrained_model='', squared=False, soft=True, sigma=0.3):
 
     if use_tpu is True:
         assert tpu_name is not None, '[ERROR] TPU name must be specified'
