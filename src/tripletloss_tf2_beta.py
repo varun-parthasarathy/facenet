@@ -140,10 +140,10 @@ def create_neural_network(model_type='resnet50', embedding_size=512, input_shape
         in_shape = tuple(in_shape[-3:])
         assert in_shape == input_shape, '[ERROR] The model input shape and the given input shape do not match'
 
-    if len(weights_path) > 1 and os.path.exists(weights_path) and os.path.isdir(weights_path):
+    if len(weights_path) > 1 and os.path.exists(weights_path):
         print('[INFO] Attempting to load weights from most recently saved checkpoint')
-        latest = tf.train.latest_checkpoint(weights_path)
         try:
+            latest = tf.train.latest_checkpoint(weights_path)
             model.load_weights(latest)
         except:
             try:
