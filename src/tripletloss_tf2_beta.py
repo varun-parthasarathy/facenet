@@ -88,8 +88,10 @@ def generate_training_dataset(data_path, image_size, batch_size, crop_size, cach
         classes_ds = classes_ds.cache(cache)
     ds = classes_ds.shuffle(len(CLASS_NAMES), reshuffle_each_iteration=True)
     ds = ds.interleave(lambda x: tf.data.Dataset(x).map(parse_class, num_parallel_calls=AUTOTUNE),
-                       cycle_length=1, block_length=images_per_person)
-    ds = ds.batch(batch_size).map(lambda x: tf.random.shuffle(x))
+                       cycle_length=len(CLASS_NAMES), block_length=images_per_person,
+                       num_parallel_calls=AUTOTUNE,
+                       deterministic=True)
+    ds = ds.batch(batch_size).map(lambda x: tf.random.shuffle(x), num_parallel_calls=AUTOTUNE)
     ds = ds.map(process_path, num_parallel_calls=AUTOTUNE)
     ds = ds.repeat()
     ds = ds.prefetch(AUTOTUNE)
