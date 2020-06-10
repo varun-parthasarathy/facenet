@@ -43,6 +43,16 @@ class RangeTestCallback(tf.keras.callbacks.Callback):
     tf.keras.backend.set_value(self.model.optimizer.lr, lr)
 
 
+class DecayMarginCallback(tf.keras.callbacks.Callback):
+    def __init__(self, loss_fn, decay_rate=0.9965):
+        super().__init__()
+        self.margin = loss_fn.margin
+        self.decay = decay_rate
+
+    def on_epoch_end(epoch, logs={}):
+        loss_fn.margin = self.margin * np.power(self.decay, epoch)
+
+
 def generate_training_dataset(data_path, image_size, batch_size, crop_size, cache='', train_classes=0,
                               use_mixed_precision=False, images_per_person=35, people_per_sample=50, use_tpu=False):
     data_path = pathlib.Path(data_path)
@@ -225,7 +235,8 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                 optimizer, model_type, embedding_size, cache_path=None, num_epochs, margin=0.35, 
                 checkpoint_path, range_test=False, use_tpu=False, tpu_name=None, test_path='',
                 use_mixed_precision=False, triplet_strategy='', images_per_person=35, 
-                people_per_sample=12, pretrained_model='', squared=False, soft=True, sigma=0.3):
+                people_per_sample=12, pretrained_model='', squared=False, soft=True, sigma=0.3,
+                decay_margin_rate=0.0):
 
     if use_tpu is True:
         assert tpu_name is not None, '[ERROR] TPU name must be specified'
@@ -282,6 +293,12 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                    squared=squared)
         print('[INFO] Using triplet focal loss.')
 
+    if decay_margin_rate > 0 and triplet_strategy != 'BATCH_HARD_V2':
+        decay_margin_callback = DecayMarginCallback(loss_fn, decay_margin_rate)
+        print('[INFO] Using decayed margin to reduce intra-class variability (experimental)')
+    else:
+        decay_margin_callback = None
+
     if range_test is True:
         range_finder = RangeTestCallback(start_lr=1e-5,
                                          end_lr=10)
@@ -301,7 +318,13 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
             assert model is not None, '[ERROR] There was a problem while loading the pre-trained weights'
             model.compile(optimizer=opt,
                           loss=loss_fn)
-        train_history = model.fit(train_dataset, epochs=5, callbacks=[range_finder], validation_data=test_dataset)
+        callback_list = [range_finder]
+        if decay_margin_callback is not None:
+            callback_list.append(decay_margin_callback)
+
+        train_history = model.fit(train_dataset, epochs=5, 
+                                  callbacks=callback_list, 
+                                  validation_data=test_dataset)
         plt.xscale('log')
         plt.plot(train_history.lrs, train_history.losses, color='blue')
         smooth_losses = savgol_filter(train_history.losses, 5)
@@ -346,7 +369,13 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
             model.compile(optimizer=opt,
                           loss=loss_fn)
 
-        train_history = model.fit(train_dataset, epochs=num_epochs, callbacks=[checkpoint_saver], 
+        callback_list = [checkpoint_saver]
+        if decay_margin_callback is not None:
+            callback_list.append(decay_margin_callback)
+
+        train_history = model.fit(train_dataset, 
+                                  epochs=num_epochs, 
+                                  callbacks=callback_list, 
                                   validation_data=test_dataset)
         
         if not os.path.exists('./results'):
@@ -421,6 +450,8 @@ if __name__ == '__main__':
                         help='Use soft margin for BATCH_HARD strategy')
     parser.add_argument('--sigma', type=float, required=False, default=0.3,
                         help='Value of sigma for FOCAL strategy')
+    parser.add_argument('--decay_margin_rate', type=float, required=False, default=0.0,
+                        help='Decay rate for margin. Recommended value to set is 0.9965')
 
     args = vars(parser.parse_args())
 
@@ -450,4 +481,5 @@ if __name__ == '__main__':
                 pretrained_model=args['pretrained_model'],
                 squared=args['squared'],
                 soft=args['soft'],
-                sigma=args['sigma'])
+                sigma=args['sigma'],
+                decay_margin_rate=args['decay_margin_rate'])
