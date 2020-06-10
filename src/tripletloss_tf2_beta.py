@@ -1,6 +1,5 @@
 import os
 import cv2
-import keras
 import pathlib
 import argparse
 import numpy as np
