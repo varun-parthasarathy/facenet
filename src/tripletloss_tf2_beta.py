@@ -44,13 +44,14 @@ class RangeTestCallback(tf.keras.callbacks.Callback):
 
 
 class DecayMarginCallback(tf.keras.callbacks.Callback):
-    def __init__(self, loss_fn, decay_rate=0.9965):
+    def __init__(self, loss_fn, decay_rate=0.9965, margin):
         super().__init__()
-        self.margin = loss_fn.margin
+        self.margin = margin
         self.decay = decay_rate
+        self.loss_fn = loss_fn
 
     def on_epoch_end(epoch, logs={}):
-        loss_fn.margin = self.margin * np.power(self.decay, epoch)
+        self.loss_fn.margin = self.margin * np.power(self.decay, epoch)
 
 
 def generate_training_dataset(data_path, image_size, batch_size, crop_size, cache='', train_classes=0,
@@ -294,7 +295,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
         print('[INFO] Using triplet focal loss.')
 
     if decay_margin_rate > 0 and triplet_strategy != 'BATCH_HARD_V2':
-        decay_margin_callback = DecayMarginCallback(loss_fn, decay_margin_rate)
+        decay_margin_callback = DecayMarginCallback(loss_fn, decay_margin_rate, margin)
         print('[INFO] Using decayed margin to reduce intra-class variability (experimental)')
     else:
         decay_margin_callback = None
