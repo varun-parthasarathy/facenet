@@ -19,97 +19,9 @@ from tensorflow.keras.applications.inception_v3 import InceptionV3
 from tensorflow.keras.applications.inception_resnet_v2 import InceptionResNetV2
 from tensorflow.keras.mixed_precision import experimental as mixed_precision
 from custom_triplet_loss import TripletBatchHardLoss, TripletFocalLoss, TripletBatchHardV2Loss
+from dataset_utils import generate_training_dataset, get_test_dataset, get_LFW_dataset
+from triplet_callbacks_and_metrics import RangeTestCallback, DecayMarginCallback, TripletLossMetrics
 
-
-class RangeTestCallback(tf.keras.callbacks.Callback):
-  def __init__(self, start_lr, end_lr):
-    super().__init__()
-    self.start_lr = start_lr
-    self.end_lr = end_lr
-
-  def on_train_begin(self, logs={}):
-    self.lrs = []
-    self.losses = []
-    tf.keras.backend.set_value(self.model.optimizer.lr, self.start_lr)
-    n_steps = self.params['steps'] if self.params['steps'] is not None else round(self.params['samples'] / self.params['batch_size'])
-    n_steps *= self.params['epochs']
-    self.by = (self.end_lr - self.start_lr) / n_steps
-
-  def on_batch_end(self, batch, logs={}):
-    lr = float(tf.keras.backend.get_value(self.model.optimizer.lr))
-    self.lrs.append(lr)
-    self.losses.append(logs.get('loss'))
-    lr += self.by
-    tf.keras.backend.set_value(self.model.optimizer.lr, lr)
-
-
-class DecayMarginCallback(tf.keras.callbacks.Callback):
-    def __init__(self, loss_fn, decay_rate=0.9965, margin):
-        super().__init__()
-        self.margin = margin
-        self.decay = decay_rate
-        self.loss_fn = loss_fn
-
-    def on_epoch_end(epoch, logs={}):
-        self.loss_fn.margin = self.margin * np.power(self.decay, epoch)
-
-
-def generate_training_dataset(data_path, image_size, batch_size, crop_size, cache='', train_classes=0,
-                              use_mixed_precision=False, images_per_person=35, people_per_sample=50, use_tpu=False):
-    data_path = pathlib.Path(data_path)
-    AUTOTUNE = tf.data.experimental.AUTOTUNE
-    CLASS_NAMES = [item.name for item in data_path.glob('*') if item.is_dir()]
-    CLASS_NAMES.sort()
-    CLASS_NAMES = np.array(CLASS_NAMES)
-    image_count = len(list(data_path.glob('*/*')))
-
-    classes_ds = tf.data.Dataset.list_files(str(data_path/'*/'))
-
-    def get_label(file_path):
-        parts = tf.strings.split(file_path, os.path.sep)
-        return np.argmax(parts[-2] == CLASS_NAMES) + train_classes
-
-    def decode_img(img):
-        img = tf.io.decode_image(img, channels=3)
-        if use_mixed_precision is True:
-            if use_tpu is True:
-                img = tf.cast(img, tf.bfloat16)
-            else:
-                img = tf.cast(img, tf.float16)
-        else:
-            img = tf.cast(img, tf.float32)
-        img = tf.image.resize(img, [image_size, image_size])
-        return img
-
-    def process_path(file_path):
-        label = get_label(file_path)
-        img = tf.io.read_file(file_path)
-        img = decode_img(img)
-        img = tf.image.random_crop(img, [crop_size, crop_size, 3])
-        img = tf.image.random_flip_left_right(img)
-        img = tf.image.random_brightness(img, 0.2)
-        img = tf.image.random_contrast(img, 0.0, 0.2)
-        img = tf.image.random_jpeg_quality(img, 70, 100)
-        img = img / 255.0
-        return img, label
-
-    def parse_class(class_path):
-        class_path = pathlib.Path(class_path)
-        return tf.data.Dataset.list_files(str(class_path/'*.jpg'), shuffle=True)
-
-    if len(cache) > 1:
-        classes_ds = classes_ds.cache(cache)
-    ds = classes_ds.shuffle(len(CLASS_NAMES), reshuffle_each_iteration=True)
-    ds = ds.interleave(lambda x: tf.data.Dataset(x).map(parse_class, num_parallel_calls=AUTOTUNE),
-                       cycle_length=len(CLASS_NAMES), block_length=images_per_person,
-                       num_parallel_calls=AUTOTUNE,
-                       deterministic=True)
-    ds = ds.map(process_path, num_parallel_calls=AUTOTUNE)
-    ds = ds.batch(batch_size).map(lambda x: tf.random.shuffle(x), num_parallel_calls=AUTOTUNE)
-    ds = ds.repeat()
-    ds = ds.prefetch(AUTOTUNE)
-
-    return ds, image_count, len(CLASS_NAMES)
 
 def create_neural_network(model_type='resnet50', embedding_size=512, input_shape=None, weights_path=''):
     base_model = None
@@ -239,7 +151,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                 checkpoint_path, range_test=False, use_tpu=False, tpu_name=None, test_path='',
                 use_mixed_precision=False, triplet_strategy='', images_per_person=35, 
                 people_per_sample=12, pretrained_model='', squared=False, soft=True, sigma=0.3,
-                decay_margin_rate=0.0):
+                decay_margin_rate=0.0, use_lfw=True):
 
     if use_tpu is True:
         assert tpu_name is not None, '[ERROR] TPU name must be specified'
@@ -257,8 +169,11 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
         mixed_precision.set_policy(policy)
         print("[INFO] Using mixed precision for training. This will reduce memory consumption\n")
 
-    train_dataset, n_imgs, n_classes = generate_training_dataset(data_path, image_size, batch_size, 
-                                                                 crop_size, cache_path,
+    train_dataset, n_imgs, n_classes = generate_training_dataset(data_path=data_path, 
+                                                                 image_size=image_size, 
+                                                                 batch_size=batch_size, 
+                                                                 crop_size=crop_size, 
+                                                                 cache=cache_path,
                                                                  train_classes=0,
                                                                  use_mixed_precision=use_mixed_precision,
                                                                  images_per_person=images_per_person,
@@ -266,13 +181,24 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                                                  use_tpu=use_tpu)
 
     if len(test_path) > 1:
-        test_dataset, _, _ = generate_training_dataset(test_path, image_size, batch_size, crop_size, 
-                                                       cache='./test_dataset_cache.tfcache',
-                                                       train_classes=n_classes,
-                                                       use_mixed_precision=use_mixed_precision,
-                                                       images_per_person=10,
-                                                       people_per_sample=10,
-                                                       use_tpu=use_tpu)
+        if use_lfw is True:
+            test_dataset = get_LFW_dataset(data_path=test_path, 
+                                           image_size=image_size, 
+                                           batch_size=batch_size,
+                                           crop_size=crop_size,
+                                           cache='./lfw_dataset_cache.tfcache',
+                                           use_mixed_precision=use_mixed_precision,
+                                           use_tpu=use_tpu,
+                                           train_classes=n_classes)
+        else:
+            test_dataset = get_test_dataset(data_path=test_path, 
+                                            image_size=image_size, 
+                                            batch_size=batch_size,
+                                            crop_size=crop_size,
+                                            cache='./test_dataset_cache.tfcache',
+                                            use_mixed_precision=use_mixed_precision,
+                                            use_tpu=use_tpu,
+                                            train_classes=n_classes)
     else:
         test_dataset = None
 
@@ -302,6 +228,8 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
     else:
         decay_margin_callback = None
 
+    triplet_loss_metrics = TripletLossMetrics()
+
     if range_test is True:
         range_finder = RangeTestCallback(start_lr=1e-5,
                                          end_lr=10)
@@ -314,13 +242,15 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                               embedding_size=embedding_size)
                 assert model is not None, '[ERROR] There was a problem while loading the pre-trained weights'
                 model.compile(optimizer=opt,
-                              loss=loss_fn)
+                              loss=loss_fn,
+                              metrics=[triplet_loss_metrics])
         else:
             model = create_neural_network(model_type=model_type,
                                           embedding_size=embedding_size)
             assert model is not None, '[ERROR] There was a problem while loading the pre-trained weights'
             model.compile(optimizer=opt,
-                          loss=loss_fn)
+                          loss=loss_fn,
+                          metrics=[triplet_loss_metrics])
         callback_list = [range_finder]
         if decay_margin_callback is not None:
             callback_list.append(decay_margin_callback)
@@ -357,20 +287,23 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                                               monitor='val_loss',
                                                               mode='min',
                                                               save_best_only=False,
-                                                              save_freq='epoch')
+                                                              #save_freq='epoch')
+                                                              period=5) # WARNING - Deprecated argument!
         if use_tpu is True:
             with strategy.scope():
                 model = create_neural_network(model_type=model_type,
                                               embedding_size=embedding_size)
                 assert model is not None, '[ERROR] There was a problem while loading the pre-trained weights'
                 model.compile(optimizer=opt,
-                              loss=loss_fn)
+                              loss=loss_fn,
+                              metrics=[triplet_loss_metrics])
         else:
             model = create_neural_network(model_type=model_type,
                                           embedding_size=embedding_size)
             assert model is not None, '[ERROR] There was a problem while loading the pre-trained weights'
             model.compile(optimizer=opt,
-                          loss=loss_fn)
+                          loss=loss_fn,
+                          metrics=[triplet_loss_metrics])
 
         callback_list = [checkpoint_saver]
         if decay_margin_callback is not None:
@@ -455,6 +388,8 @@ if __name__ == '__main__':
                         help='Value of sigma for FOCAL strategy')
     parser.add_argument('--decay_margin_rate', type=float, required=False, default=0.0,
                         help='Decay rate for margin. Recommended value to set is 0.9965')
+    parser.add_argument('--use_lfw', action='store_true',
+                        help='Specifies whether test dataset is the LFW dataset or not')
 
     args = vars(parser.parse_args())
 
@@ -485,4 +420,5 @@ if __name__ == '__main__':
                 squared=args['squared'],
                 soft=args['soft'],
                 sigma=args['sigma'],
-                decay_margin_rate=args['decay_margin_rate'])
+                decay_margin_rate=args['decay_margin_rate'],
+                use_lfw=args['use_lfw'])
