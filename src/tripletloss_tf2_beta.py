@@ -94,6 +94,7 @@ def generate_training_dataset(data_path, image_size, batch_size, crop_size, cach
         return img, label
 
     def parse_class(class_path):
+        class_path = pathlib.Path(class_path)
         return tf.data.Dataset.list_files(str(class_path/'*.jpg'), shuffle=True)
 
     if len(cache) > 1:
