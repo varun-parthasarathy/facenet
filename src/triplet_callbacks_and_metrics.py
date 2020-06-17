@@ -130,7 +130,7 @@ class TripletLossMetrics(tf.keras.metrics.Metric):
 
     def result(self):
         result_string = 'Accuracy : {}%+-{}% :: Validation rate : {}%+-{}% @FAR : {} :: AUC : {} :: EER : {}'
-        thresholds = np.arange(0, 4, 0.01)
+        thresholds = np.arange(0, 2, 0.01)
         y_pred = tf.make_ndarray(tf.make_tensor_proto(self.embeddings)) # Try using tensor.numpy() instead
         embeddings1 = y_pred[0::2]
         embeddings2 = y_pred[1::2]
@@ -138,7 +138,7 @@ class TripletLossMetrics(tf.keras.metrics.Metric):
         actual_issame = np.equal(y_true[0::2], y_true[1::2])
         tpr, fpr, accuracy, acc_std = _calculate_roc(thresholds, embeddings1, embeddings2,
                                                      actual_issame, nrof_folds=10, distance_metric=0)
-        thresholds = np.arange(0, 4, 0.001)
+        thresholds = np.arange(0, 2, 0.001)
         val, val_std, far = _calculate_val(thresholds, embeddings1, embeddings2,
                                            actual_issame, 1e-3, nrof_folds=10, distance_metric=0)
         auc = metrics.auc(fpr, tpr)
