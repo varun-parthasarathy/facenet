@@ -174,7 +174,6 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                                                  batch_size=batch_size, 
                                                                  crop_size=crop_size, 
                                                                  cache=cache_path,
-                                                                 train_classes=0,
                                                                  use_mixed_precision=use_mixed_precision,
                                                                  images_per_person=images_per_person,
                                                                  people_per_sample=people_per_sample,
@@ -182,23 +181,23 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
 
     if len(test_path) > 1:
         if use_lfw is True:
-            test_dataset = get_LFW_dataset(data_path=test_path, 
-                                           image_size=image_size, 
-                                           batch_size=batch_size,
-                                           crop_size=crop_size,
-                                           cache='./lfw_dataset_cache.tfcache',
-                                           use_mixed_precision=use_mixed_precision,
-                                           use_tpu=use_tpu,
-                                           train_classes=n_classes)
+            test_dataset, test_images, _ = get_LFW_dataset(data_path=test_path, 
+                                                           image_size=image_size, 
+                                                           batch_size=batch_size,
+                                                           crop_size=crop_size,
+                                                           cache='./lfw_dataset_cache.tfcache',
+                                                           use_mixed_precision=use_mixed_precision,
+                                                           use_tpu=use_tpu,
+                                                           train_classes=n_classes)
         else:
-            test_dataset = get_test_dataset(data_path=test_path, 
-                                            image_size=image_size, 
-                                            batch_size=batch_size,
-                                            crop_size=crop_size,
-                                            cache='./test_dataset_cache.tfcache',
-                                            use_mixed_precision=use_mixed_precision,
-                                            use_tpu=use_tpu,
-                                            train_classes=n_classes)
+            test_dataset, test_images, _ = get_test_dataset(data_path=test_path, 
+                                                            image_size=image_size, 
+                                                            batch_size=30,
+                                                            crop_size=crop_size,
+                                                            cache='./test_dataset_cache.tfcache',
+                                                            use_mixed_precision=use_mixed_precision,
+                                                            use_tpu=use_tpu,
+                                                            train_classes=n_classes)
     else:
         test_dataset = None
 
@@ -228,7 +227,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
     else:
         decay_margin_callback = None
 
-    triplet_loss_metrics = TripletLossMetrics()
+    triplet_loss_metrics = TripletLossMetrics(test_images, embedding_size)
 
     if range_test is True:
         range_finder = RangeTestCallback(start_lr=1e-5,

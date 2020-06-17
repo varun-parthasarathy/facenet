@@ -24,7 +24,9 @@ def _get_paths(lfw_dir, pairs):
             classes.add(pair[0])
             classes.add(pair[2])
         if os.path.exists(path0) and os.path.exists(path1):    # Only add the pair if both paths exist
-            path_list += (path0,path1)
+            #path_list += (path0,path1)
+            path_list.append(path0)
+            path_list.append(path1)
             issame_list.append(issame)
         else:
             nrof_skipped_pairs += 1
@@ -53,7 +55,7 @@ def _read_pairs(pairs_filename):
 #-----------------------------------------------------------------------------------------------------------------
 #-----------------------------------------------------------------------------------------------------------------
 
-def generate_training_dataset(data_path, image_size, batch_size, crop_size, cache='', train_classes=0,
+def generate_training_dataset(data_path, image_size, batch_size, crop_size, cache='',
                               use_mixed_precision=False, images_per_person=35, people_per_sample=50, 
                               use_tpu=False):
     data_path = pathlib.Path(data_path)
@@ -67,7 +69,7 @@ def generate_training_dataset(data_path, image_size, batch_size, crop_size, cach
 
     def get_label(file_path):
         parts = tf.strings.split(file_path, os.path.sep)
-        return np.argmax(parts[-2] == CLASS_NAMES) + train_classes
+        return np.argmax(parts[-2] == CLASS_NAMES)
 
     def decode_img(img):
         img = tf.io.decode_image(img, channels=3)
@@ -120,7 +122,7 @@ def get_test_dataset(data_path, image_size, batch_size, crop_size, cache='', tra
     CLASS_NAMES = [item.name for item in data_path.glob('*') if item.is_dir()]
     CLASS_NAMES.sort()
     CLASS_NAMES = np.array(CLASS_NAMES)
-    image_count = len(list(data_path.glob('*/*')))
+    image_count = len(CLASS_NAMES)*3
 
     classes_ds = tf.data.Dataset.list_files(str(data_path/'*/'))
 
@@ -173,6 +175,9 @@ def get_LFW_dataset(data_path, image_size, batch_size, crop_size, cache='', trai
     assert batch_size % 2 == 0, '[ERROR] Batch size must be a multiple of 2'
     pairs = _read_pairs('./data/pairs.txt')
     path_list, _, CLASS_NAMES = _get_paths(data_path, pairs)
+    CLASS_NAMES.sort()
+    CLASS_NAMES = np.array(CLASS_NAMES)
+    image_count = len(path_list)
 
     ds = tf.data.Dataset.from_tensor_slices(path_list)
 

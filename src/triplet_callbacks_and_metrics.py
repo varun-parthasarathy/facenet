@@ -112,45 +112,35 @@ def _calculate_val_far(threshold, dist, actual_issame):
 
 
 class TripletLossMetrics(tf.keras.metrics.Metric):
-    def __init__(self, name='TripletLossMetrics', **kwargs):
+    def __init__(self, nrof_images, embedding_size, name='TripletLossMetrics', **kwargs):
         super(TripletLossMetrics, self).__init__(name=name, **kwargs)
-        self.tpr = self.add_weight(name='tpr', initializer='zeros', dtype=tf.float32)
-        self.fpr = self.add_weight(name='fpr', initializer='zeros', dtype=tf.float32)
-        self.nrof_test_batches = self.add_weight(name='nrof_test_batches', initializer='zeros', dtype=tf.float32)
-        self.accuracy = self.add_weight(name='accuracy', initializer='zeros', dtype=tf.float32)
-        self.val_rate = self.add_weight(name='val_rate', initializer='zeros', dtype=tf.float32)
-        self.val_std = self.add_weight(name='val_std', initializer='zeros', dtype=tf.float32)
-        self.far = self.add_weight(name='far', initializer='zeros', dtype=tf.float32)
-        self.accuracy_std = self.add_weight(name='acc_std', initializer='zeros', dtype=tf.float32)
+        self.labels = self.add_weight(name='labels', initializer='zeros', shape=(nrof_images), dtype=tf.int64)
+        self.embeddings = self.add_weight(name='embeddings', initializer='zeros',
+                                          shape=(nrof_images, embedding_size),
+                                          dtype=tf.float32)
+        self.nrof_batches = self.add_weight(name='batches', initializer='zeros', dtype=tf.int64)
+        self.start_idx = self.add_weight(name='start_idx', initializer='zeros', dtype=tf.int64)
 
     def update_state(self, y_true, y_pred, sample_weight=None):
+        end_idx = self.start_idx + tf.shape(y_pred).numpy()[0]
+        self.labels[self.start_idx:end_idx] = y_true
+        self.embeddings[self.start_idx:end_idx] = y_pred
+        self.start_idx.assign(end_idx)
+        self.nrof_batches.assign_add(1)
+
+    def result(self):
+        result_string = 'Accuracy : {}%+-{}% :: Validation rate : {}%+-{}% @FAR : {} :: AUC : {} :: EER : {}'
         thresholds = np.arange(0, 4, 0.01)
+        y_pred = tf.make_ndarray(tf.make_tensor_proto(self.embeddings)) # Try using tensor.numpy() instead
         embeddings1 = y_pred[0::2]
         embeddings2 = y_pred[1::2]
+        y_true = tf.make_ndarray(tf.make_tensor_proto(self.labels))
         actual_issame = np.equal(y_true[0::2], y_true[1::2])
         tpr, fpr, accuracy, acc_std = _calculate_roc(thresholds, embeddings1, embeddings2,
                                                      actual_issame, nrof_folds=10, distance_metric=0)
         thresholds = np.arange(0, 4, 0.001)
         val, val_std, far = _calculate_val(thresholds, embeddings1, embeddings2,
                                            actual_issame, 1e-3, nrof_folds=10, distance_metric=0)
-        self.tpr.assign_add(tpr)
-        self.fpr.assign_add(fpr)
-        self.nrof_test_batches.assign_add(1)
-        self.accuracy.assign_add(accuracy)
-        self.val_rate.assign_add(val)
-        self.val_std.assign_add(val_std)
-        self.far.assign_add(far)
-        self.accuracy_std.assign_add(acc_std)
-
-    def result(self):
-        result_string = 'Accuracy : {}+-{} :: Validation rate : {}+-{} :: FAR : {} :: AUC : {} :: EER : {}'
-        tpr = float(self.tpr / self.nrof_test_batches)
-        fpr = float(self.fpr / self.nrof_test_batches)
-        acc = float(self.accuracy / self.nrof_test_batches)
-        acc_std = float(self.accuracy_std / self.nrof_test_batches)
-        val = float(self.val_rate / self.nrof_test_batches)
-        val_std = float(self.val_std / self.nrof_test_batches)
-        far = float(self.far / self.nrof_test_batches)
         auc = metrics.auc(fpr, tpr)
         eer = brentq(lambda x: 1. - x - interpolate.interp1d(fpr, tpr)(x), 0., 1.)
         result_string.format(acc, acc_std, val, val_std, far, auc, eer)
@@ -158,13 +148,10 @@ class TripletLossMetrics(tf.keras.metrics.Metric):
         return tf.convert_to_tensor(result_string, dtype=str)
 
     def reset_states(self):
-        self.tpr.assign(0)
-        self.fpr.assign(0)
-        self.nrof_test_batches.assign(0)
-        self.accuracy.assign(0)
-        self.val_rate.assign(0)
-        self.val_std.assign(0)
-        self.far.assign(0)
+        self.labels.assign(np.zeros(tf.shape(self.labels).numpy()))
+        self.embeddings.assign(np.zeros(tf.shape(self.embeddings).numpy()))
+        self.nrof_batches.assign(0)
+        self.start_idx.assign(0)
 
 
 class RangeTestCallback(tf.keras.callbacks.Callback):
