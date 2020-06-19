@@ -177,11 +177,12 @@ class RangeTestCallback(tf.keras.callbacks.Callback):
 
 
 class DecayMarginCallback(tf.keras.callbacks.Callback):
-    def __init__(self, loss_fn, decay_rate=0.9965, margin):
+    def __init__(self, loss_fn, decay_rate=0.9965, margin, target_margin=0.2):
         super().__init__()
         self.margin = margin
         self.decay = decay_rate
         self.loss_fn = loss_fn
+        self.target_margin = target_margin
 
     def on_epoch_end(epoch, logs={}):
-        self.loss_fn.margin = self.margin * np.power(self.decay, epoch)
+        self.loss_fn.margin = max(self.margin * np.power(self.decay, epoch), self.target_margin)

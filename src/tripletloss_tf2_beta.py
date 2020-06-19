@@ -151,7 +151,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                 checkpoint_path, range_test=False, use_tpu=False, tpu_name=None, test_path='',
                 use_mixed_precision=False, triplet_strategy='', images_per_person=35, 
                 people_per_sample=12, pretrained_model='', squared=False, soft=True, sigma=0.3,
-                decay_margin_rate=0.0, use_lfw=True):
+                decay_margin_rate=0.0, use_lfw=True, target_margin=0.2):
 
     if use_tpu is True:
         assert tpu_name is not None, '[ERROR] TPU name must be specified'
@@ -222,7 +222,8 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
         print('[INFO] Using triplet focal loss.')
 
     if decay_margin_rate > 0 and triplet_strategy != 'BATCH_HARD_V2':
-        decay_margin_callback = DecayMarginCallback(loss_fn, decay_margin_rate, margin)
+        decay_margin_callback = DecayMarginCallback(loss_fn, decay_margin_rate, 
+                                                    margin, target_margin)
         print('[INFO] Using decayed margin to reduce intra-class variability (experimental)')
     else:
         decay_margin_callback = None
@@ -389,6 +390,8 @@ if __name__ == '__main__':
                         help='Decay rate for margin. Recommended value to set is 0.9965')
     parser.add_argument('--use_lfw', action='store_true',
                         help='Specifies whether test dataset is the LFW dataset or not')
+    parser.add_argument('--target_margin', type=float, default=0.2, required=False,
+                        help='Minimum margin when using decayed margin')
 
     args = vars(parser.parse_args())
 
@@ -420,4 +423,5 @@ if __name__ == '__main__':
                 soft=args['soft'],
                 sigma=args['sigma'],
                 decay_margin_rate=args['decay_margin_rate'],
-                use_lfw=args['use_lfw'])
+                use_lfw=args['use_lfw'],
+                target_margin=args['target_margin'])
