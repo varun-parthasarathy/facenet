@@ -17,8 +17,9 @@
 import tensorflow as tf
 from tensorflow_addons.losses import metric_learning
 from tensorflow_addons.utils.types import FloatTensorLike, TensorLike
+from tensorflow_addons.utils.keras_utils import LossFunctionWrapper
 from typeguard import typechecked
-from typing import Optional
+from typing import Optional, Union, Callable
 
 
 def _masked_maximum(data, mask, dim=1):
@@ -67,7 +68,7 @@ def triplet_focal_loss(
     y_pred: TensorLike,
     margin: FloatTensorLike = 0.2,
     sigma: FloatTensorLike = 0.3,
-    squared: bool = False
+    distance_metric: Union[str, Callable] = "L2",
 ) -> tf.Tensor:
     """Computes the triplet focal loss with hard negative and hard positive mining.
     Args:
@@ -77,15 +78,50 @@ def triplet_focal_loss(
         be l2 normalized.
       margin: Float, margin term in the loss definition.
       sigma: Float, sigma term in the loss definition.
-      squared: Boolean, if set, use squared Euclidean instead of Euclidean distance.
+      distance_metric: str or function, determines distance metric:
+                       "L2" for l2-norm distance
+                       "squared-L2" for squared l2-norm distance
+                       "angular" for cosine similarity
+                        A custom function returning a 2d adjacency
+                          matrix of a chosen distance metric can
+                          also be passed here. e.g.
+                          def custom_distance(batch):
+                              batch = 1 - batch @ batch.T
+                              return batch
+                          triplet_focal_loss(batch, labels,
+                                        distance_metric=custom_distance
+                                    )
     """
     labels, embeddings = y_true, y_pred
+
+    convert_to_float32 = (
+        embeddings.dtype == tf.dtypes.float16 or embeddings.dtype == tf.dtypes.bfloat16
+    )
+    precise_embeddings = (
+        tf.cast(embeddings, tf.dtypes.float32) if convert_to_float32 else embeddings
+    )
+
     # Reshape label tensor to [batch_size, 1].
     lshape = tf.shape(labels)
     labels = tf.reshape(labels, [lshape[0], 1])
 
     # Build pairwise squared distance matrix.
-    pdist_matrix = metric_learning.pairwise_distance(embeddings, squared=squared)
+    if distance_metric == "L2":
+        pdist_matrix = metric_learning.pairwise_distance(
+            precise_embeddings, squared=False
+        )
+
+    elif distance_metric == "squared-L2":
+        pdist_matrix = metric_learning.pairwise_distance(
+            precise_embeddings, squared=True
+        )
+
+    elif distance_metric == "angular":
+        pdist_matrix = metric_learning.angular_distance(precise_embeddings)
+
+    else:
+        pdist_matrix = distance_metric(precise_embeddings)
+
     # Build pairwise binary adjacency matrix.
     adjacency = tf.math.equal(labels, tf.transpose(labels))
     # Invert so we can select negatives only.
@@ -114,7 +150,10 @@ def triplet_focal_loss(
     # Get final mean triplet loss
     triplet_loss = tf.reduce_mean(triplet_loss)
 
-    return triplet_loss
+    if convert_to_float32:
+        return tf.cast(triplet_loss, embeddings.dtype)
+    else:
+        return triplet_loss
 
 
 
@@ -124,7 +163,7 @@ def triplet_batch_hard_loss(
     y_pred: TensorLike,
     margin: FloatTensorLike = 1.0,
     soft: bool = False,
-    squared: bool = False
+    distance_metric: Union[str, Callable] = "L2",
 ) -> tf.Tensor:
     """Computes the triplet loss with hard negative and hard positive mining.
     Args:
@@ -134,15 +173,52 @@ def triplet_batch_hard_loss(
         be l2 normalized.
       margin: Float, margin term in the loss definition.
       soft: Boolean, if set, use the soft margin version.
-      squared: Boolean, if set, use squared Euclidean instead of Euclidean distance.
+      distance_metric: str or function, determines distance metric:
+                       "L2" for l2-norm distance
+                       "squared-L2" for squared l2-norm distance
+                       "angular" for cosine similarity
+                        A custom function returning a 2d adjacency
+                          matrix of a chosen distance metric can
+                          also be passed here. e.g.
+                          def custom_distance(batch):
+                              batch = 1 - batch @ batch.T
+                              return batch
+                          triplet_batch_hard_loss(batch, labels,
+                                        distance_metric=custom_distance
+                                    )
+    Returns:
+      triplet_loss: float scalar with dtype of y_pred.
     """
     labels, embeddings = y_true, y_pred
+
+    convert_to_float32 = (
+        embeddings.dtype == tf.dtypes.float16 or embeddings.dtype == tf.dtypes.bfloat16
+    )
+    precise_embeddings = (
+        tf.cast(embeddings, tf.dtypes.float32) if convert_to_float32 else embeddings
+    )
+
     # Reshape label tensor to [batch_size, 1].
     lshape = tf.shape(labels)
     labels = tf.reshape(labels, [lshape[0], 1])
 
     # Build pairwise squared distance matrix.
-    pdist_matrix = metric_learning.pairwise_distance(embeddings, squared=squared)
+    if distance_metric == "L2":
+        pdist_matrix = metric_learning.pairwise_distance(
+            precise_embeddings, squared=False
+        )
+
+    elif distance_metric == "squared-L2":
+        pdist_matrix = metric_learning.pairwise_distance(
+            precise_embeddings, squared=True
+        )
+
+    elif distance_metric == "angular":
+        pdist_matrix = metric_learning.angular_distance(precise_embeddings)
+
+    else:
+        pdist_matrix = distance_metric(precise_embeddings)
+
     # Build pairwise binary adjacency matrix.
     adjacency = tf.math.equal(labels, tf.transpose(labels))
     # Invert so we can select negatives only.
@@ -169,11 +245,12 @@ def triplet_batch_hard_loss(
         triplet_loss = tf.maximum(hard_positives - hard_negatives + margin, 0.0)
 
     # Get final mean triplet loss
-    #zero = tf.constant(0.0, dtype=tf.dtypes.float32)
-    #triplet_loss = tf.reduce_mean(tf.boolean_mask(triplet_loss, tf.math.not_equal(triplet_loss, zero)))
     triplet_loss = tf.reduce_mean(triplet_loss)
 
-    return triplet_loss
+    if convert_to_float32:
+        return tf.cast(triplet_loss, embeddings.dtype)
+    else:
+        return triplet_loss
 
 @tf.function
 def triplet_batch_hard_v2_loss(
@@ -182,7 +259,7 @@ def triplet_batch_hard_v2_loss(
     margin1: FloatTensorLike = -1.0,
     margin2: FloatTensorLike = 0.01,
     beta: FloatTensorLike = 0.002,
-    squared: bool = False
+    distance_metric: Union[str, Callable] = "L2",
 ) -> tf.Tensor:
     """Computes the triplet loss with hard negative and hard positive mining.
     Args:
@@ -193,17 +270,52 @@ def triplet_batch_hard_v2_loss(
       margin1: Float, margin term in the loss definition.
       margin2: Float, margin term in the loss definition.
       beta: Float, multiplier for intra-class constraint.
-      squared: Boolean, if set, use squared Euclidean instead of Euclidean distance.
+      distance_metric: str or function, determines distance metric:
+                       "L2" for l2-norm distance
+                       "squared-L2" for squared l2-norm distance
+                       "angular" for cosine similarity
+                        A custom function returning a 2d adjacency
+                          matrix of a chosen distance metric can
+                          also be passed here. e.g.
+                          def custom_distance(batch):
+                              batch = 1 - batch @ batch.T
+                              return batch
+                          triplet_batch_hard_v2_loss(batch, labels,
+                                        distance_metric=custom_distance
+                                    )
 
       See https://ieeexplore.ieee.org/document/7780518
     """
     labels, embeddings = y_true, y_pred
+
+    convert_to_float32 = (
+        embeddings.dtype == tf.dtypes.float16 or embeddings.dtype == tf.dtypes.bfloat16
+    )
+    precise_embeddings = (
+        tf.cast(embeddings, tf.dtypes.float32) if convert_to_float32 else embeddings
+    )
+
     # Reshape label tensor to [batch_size, 1].
     lshape = tf.shape(labels)
     labels = tf.reshape(labels, [lshape[0], 1])
 
     # Build pairwise squared distance matrix.
-    pdist_matrix = metric_learning.pairwise_distance(embeddings, squared=squared)
+    if distance_metric == "L2":
+        pdist_matrix = metric_learning.pairwise_distance(
+            precise_embeddings, squared=False
+        )
+
+    elif distance_metric == "squared-L2":
+        pdist_matrix = metric_learning.pairwise_distance(
+            precise_embeddings, squared=True
+        )
+
+    elif distance_metric == "angular":
+        pdist_matrix = metric_learning.angular_distance(precise_embeddings)
+
+    else:
+        pdist_matrix = distance_metric(precise_embeddings)
+
     # Build pairwise binary adjacency matrix.
     adjacency = tf.math.equal(labels, tf.transpose(labels))
     # Invert so we can select negatives only.
@@ -230,10 +342,13 @@ def triplet_batch_hard_v2_loss(
     # Get final mean triplet loss
     triplet_loss = tf.reduce_mean(triplet_loss)
 
-    return triplet_loss
+    if convert_to_float32:
+        return tf.cast(triplet_loss, embeddings.dtype)
+    else:
+        return triplet_loss
 
 
-class TripletFocalLoss(tf.keras.losses.Loss):
+class TripletFocalLoss(LossFunctionWrapper):
     """Computes the triplet loss with hard negative mining.
     The loss encourages the positive distances (between a pair of embeddings
     with the same labels) to be smaller than the minimum negative distance
@@ -247,7 +362,19 @@ class TripletFocalLoss(tf.keras.losses.Loss):
     Args:
       margin: Float, margin term in the loss definition. Default value is 1.0.
       sigma: Float, sigma term in the loss definition.
-      squared: Boolean, if set, use squared Euclidean instead of Euclidean distance
+      distance_metric: str or function, determines distance metric:
+                       "L2" for l2-norm distance
+                       "squared-L2" for squared l2-norm distance
+                       "angular" for cosine similarity
+                        A custom function returning a 2d adjacency
+                          matrix of a chosen distance metric can
+                          also be passed here. e.g.
+                          def custom_distance(batch):
+                              batch = 1 - batch @ batch.T
+                              return batch
+                          triplet_semihard_loss(batch, labels,
+                                        distance_metric=custom_distance
+                                    )
       name: Optional name for the op.
     """
 
@@ -255,23 +382,15 @@ class TripletFocalLoss(tf.keras.losses.Loss):
     def __init__(
         self, margin: FloatTensorLike = 1.0, 
         sigma: FloatTensorLike = 0.3,
-        squared: bool = False,
+        distance_metric: Union[str, Callable] = "L2",
         name: Optional[str] = None, **kwargs
     ):
-        super().__init__(name=name, reduction=tf.keras.losses.Reduction.NONE)
-        self.margin = margin
-        self.sigma = sigma
-        self.squared = squared
-
-    def call(self, y_true, y_pred):
-        return triplet_focal_loss(y_true, y_pred, self.margin, self.sigma, self.squared)
-
-    def get_config(self):
-        config = {
-            "margin": self.margin,
-        }
-        base_config = super().get_config()
-        return {**base_config, **config}
+        super().__init__(triplet_focal_loss,
+                         name = name, 
+                         reduction = tf.keras.losses.Reduction.NONE,
+                         margin = margin,
+                         sigma = sigma,
+                         distance_metric = distance_metric)
 
 
 class TripletBatchHardLoss(tf.keras.losses.Loss):
@@ -289,7 +408,19 @@ class TripletBatchHardLoss(tf.keras.losses.Loss):
       margin: Float, margin term in the loss definition. Default value is 1.0.
       soft: Boolean, if set, use the soft margin version. Default value is False.
       name: Optional name for the op.
-      squared: Boolean, if set, use squared Euclidean instead of Euclidean distance
+      distance_metric: str or function, determines distance metric:
+                       "L2" for l2-norm distance
+                       "squared-L2" for squared l2-norm distance
+                       "angular" for cosine similarity
+                        A custom function returning a 2d adjacency
+                          matrix of a chosen distance metric can
+                          also be passed here. e.g.
+                          def custom_distance(batch):
+                              batch = 1 - batch @ batch.T
+                              return batch
+                          triplet_semihard_loss(batch, labels,
+                                        distance_metric=custom_distance
+                                    )
     """
 
     @typechecked
@@ -297,25 +428,16 @@ class TripletBatchHardLoss(tf.keras.losses.Loss):
         self,
         margin: FloatTensorLike = 1.0,
         soft: bool = False,
-        squared: bool = False,
+        distance_metric: Union[str, Callable] = "L2",
         name: Optional[str] = None,
         **kwargs
     ):
-        super().__init__(name=name, reduction=tf.keras.losses.Reduction.NONE)
-        self.margin = margin
-        self.soft = soft
-        self.squared = squared
-
-    def call(self, y_true, y_pred):
-        return triplet_batch_hard_loss(y_true, y_pred, self.margin, self.soft, self.squared)
-
-    def get_config(self):
-        config = {
-            "margin": self.margin,
-            "soft": self.soft,
-        }
-        base_config = super().get_config()
-        return {**base_config, **config}
+        super().__init__(triplet_batch_hard_loss,
+                         name = name, 
+                         reduction = tf.keras.losses.Reduction.NONE,
+                         margin = margin,
+                         soft = soft,
+                         distance_metric = distance_metric)
 
 
 class TripletBatchHardV2Loss(tf.keras.losses.Loss):
@@ -334,7 +456,19 @@ class TripletBatchHardV2Loss(tf.keras.losses.Loss):
       margin: Float, margin term in the loss definition. Default value is 1.0.
       soft: Boolean, if set, use the soft margin version. Default value is False.
       name: Optional name for the op.
-      squared: Boolean, if set, use squared Euclidean instead of Euclidean distance
+      distance_metric: str or function, determines distance metric:
+                       "L2" for l2-norm distance
+                       "squared-L2" for squared l2-norm distance
+                       "angular" for cosine similarity
+                        A custom function returning a 2d adjacency
+                          matrix of a chosen distance metric can
+                          also be passed here. e.g.
+                          def custom_distance(batch):
+                              batch = 1 - batch @ batch.T
+                              return batch
+                          triplet_semihard_loss(batch, labels,
+                                        distance_metric=custom_distance
+                                    )
     """
 
     @typechecked
@@ -343,23 +477,14 @@ class TripletBatchHardV2Loss(tf.keras.losses.Loss):
         margin1: FloatTensorLike = -1.0,
         margin2: FloatTensorLike = 0.01,
         beta: FloatTensorLike = 0.002,
-        squared: bool = False,
+        distance_metric: Union[str, Callable] = "L2",
         name: Optional[str] = None,
         **kwargs
     ):
-        super().__init__(name=name, reduction=tf.keras.losses.Reduction.NONE)
-        self.margin1 = margin1
-        self.margin2 = margin2
-        self.beta = beta
-        self.squared = squared
-
-    def call(self, y_true, y_pred):
-        return triplet_batch_hard_v2_loss(y_true, y_pred, self.margin1, self.margin2, self.beta, self.squared)
-
-    def get_config(self):
-        config = {
-            "margin": self.margin,
-            "soft": self.soft,
-        }
-        base_config = super().get_config()
-        return {**base_config, **config}
+        super().__init__(triplet_batch_hard_v2_loss,
+                         name = name, 
+                         reduction = tf.keras.losses.Reduction.NONE,
+                         margin1 = margin1,
+                         margin2 = margin2,
+                         beta = beta,
+                         distance_metric = distance_metric)

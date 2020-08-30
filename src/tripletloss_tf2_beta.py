@@ -150,8 +150,8 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                 optimizer, model_type, embedding_size, cache_path=None, num_epochs, margin=0.35, 
                 checkpoint_path, range_test=False, use_tpu=False, tpu_name=None, test_path='',
                 use_mixed_precision=False, triplet_strategy='', images_per_person=35, 
-                people_per_sample=12, pretrained_model='', squared=False, soft=True, sigma=0.3,
-                decay_margin_rate=0.0, use_lfw=True, target_margin=0.2):
+                people_per_sample=12, pretrained_model='', distance_metric="L2", soft=True, 
+                sigma=0.3, decay_margin_rate=0.0, use_lfw=True, target_margin=0.2):
 
     if use_tpu is True:
         assert tpu_name is not None, '[ERROR] TPU name must be specified'
@@ -207,18 +207,18 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
     elif triplet_strategy == 'BATCH_HARD':
         loss_fn = TripletBatchHardLoss(margin=margin,
                                        soft=soft,
-                                       squared=squared)
+                                       distance_metric=distance_metric)
         print('[INFO] Using batch-hard strategy.')
     elif triplet_strategy == 'BATCH_HARD_V2':
         loss_fn = TripletBatchHardV2Loss(margin1=(-1.0*margin),
                                          margin2=(margin1/100.0),
                                          beta=0.002,
-                                         squared=squared)
+                                         distance_metric=distance_metric)
         print('[INFO] Using batch-hard V2 strategy')
     else:
         loss_fn = TripletFocalLoss(margin=margin,
                                    sigma=sigma,
-                                   squared=squared)
+                                   distance_metric=distance_metric)
         print('[INFO] Using triplet focal loss.')
 
     if decay_margin_rate > 0 and triplet_strategy != 'BATCH_HARD_V2':
@@ -380,8 +380,9 @@ if __name__ == '__main__':
                         help='Number of people per sample. Helps fill buffer for shuffling the dataset properly')
     parser.add_argument('--pretrained_model', required=False, type=str,
                         help='Path to pretrained model OR folder containing previously trained checkpoints')
-    parser.add_argument('--squared', action='store_true',
-                        help='Whether to use squared Euclidean distance or not')
+    parser.add_argument('--distance_metric', required=False, type=str, default='L2',
+                        choices=['L2', 'squared-L2', 'angular'],
+                        help='Choice of distance metric. Default is Euclidean distance')
     parser.add_argument('--soft', action='store_true',
                         help='Use soft margin for BATCH_HARD strategy')
     parser.add_argument('--sigma', type=float, required=False, default=0.3,
@@ -419,7 +420,7 @@ if __name__ == '__main__':
                 images_per_person=args['images_per_person'],
                 people_per_sample=args['people_per_sample'],
                 pretrained_model=args['pretrained_model'],
-                squared=args['squared'],
+                distance_metric=args['distance_metric'],
                 soft=args['soft'],
                 sigma=args['sigma'],
                 decay_margin_rate=args['decay_margin_rate'],
