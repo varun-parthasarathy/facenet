@@ -218,6 +218,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
     else:
         loss_fn = TripletFocalLoss(margin=margin,
                                    sigma=sigma,
+                                   soft=soft,
                                    distance_metric=distance_metric)
         print('[INFO] Using triplet focal loss.')
 

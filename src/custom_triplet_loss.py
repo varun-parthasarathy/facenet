@@ -68,6 +68,7 @@ def triplet_focal_loss(
     y_pred: TensorLike,
     margin: FloatTensorLike = 0.2,
     sigma: FloatTensorLike = 0.3,
+    soft: bool = False,
     distance_metric: Union[str, Callable] = "L2",
 ) -> tf.Tensor:
     """Computes the triplet focal loss with hard negative and hard positive mining.
@@ -145,7 +146,10 @@ def triplet_focal_loss(
     p_hard = tf.math.exp(tf.math.divide(hard_positives, sigma))
     n_hard = tf.math.exp(tf.math.divide(hard_negatives, sigma))
 
-    triplet_loss = tf.maximum(p_hard - n_hard + margin, 0.0)
+    if soft:
+        triplet_loss = tf.math.log1p(tf.math.exp(p_hard - n_hard))
+    else:
+        triplet_loss = tf.maximum(p_hard - n_hard + margin, 0.0)
 
     # Get final mean triplet loss
     triplet_loss = tf.reduce_mean(triplet_loss)
@@ -382,6 +386,7 @@ class TripletFocalLoss(LossFunctionWrapper):
     def __init__(
         self, margin: FloatTensorLike = 1.0, 
         sigma: FloatTensorLike = 0.3,
+        soft: bool = False,
         distance_metric: Union[str, Callable] = "L2",
         name: Optional[str] = None, **kwargs
     ):
@@ -390,6 +395,7 @@ class TripletFocalLoss(LossFunctionWrapper):
                          reduction = tf.keras.losses.Reduction.NONE,
                          margin = margin,
                          sigma = sigma,
+                         soft = soft,
                          distance_metric = distance_metric)
 
 
