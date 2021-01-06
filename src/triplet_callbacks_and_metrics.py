@@ -155,25 +155,25 @@ class TripletLossMetrics(tf.keras.metrics.Metric):
 
 
 class RangeTestCallback(tf.keras.callbacks.Callback):
-  def __init__(self, start_lr, end_lr):
-    super().__init__()
-    self.start_lr = start_lr
-    self.end_lr = end_lr
+    def __init__(self, start_lr, end_lr):
+        super().__init__()
+        self.start_lr = start_lr
+        self.end_lr = end_lr
 
-  def on_train_begin(self, logs={}):
-    self.lrs = []
-    self.losses = []
-    tf.keras.backend.set_value(self.model.optimizer.lr, self.start_lr)
-    n_steps = self.params['steps'] if self.params['steps'] is not None else round(self.params['samples'] / self.params['batch_size'])
-    n_steps *= self.params['epochs']
-    self.by = (self.end_lr - self.start_lr) / n_steps
+    def on_train_begin(self, logs={}):
+        self.lrs = []
+        self.losses = []
+        tf.keras.backend.set_value(self.model.optimizer.lr, self.start_lr)
+        n_steps = self.params['steps'] if self.params['steps'] is not None else round(self.params['samples'] / self.params['batch_size'])
+        n_steps *= self.params['epochs']
+        self.by = (self.end_lr - self.start_lr) / n_steps
 
-  def on_batch_end(self, batch, logs={}):
-    lr = float(tf.keras.backend.get_value(self.model.optimizer.lr))
-    self.lrs.append(lr)
-    self.losses.append(logs.get('loss'))
-    lr += self.by
-    tf.keras.backend.set_value(self.model.optimizer.lr, lr)
+    def on_batch_end(self, batch, logs={}):
+        lr = float(tf.keras.backend.get_value(self.model.optimizer.lr))
+        self.lrs.append(lr)
+        self.losses.append(logs.get('loss'))
+        lr += self.by
+        tf.keras.backend.set_value(self.model.optimizer.lr, lr)
 
 
 class DecayMarginCallback(tf.keras.callbacks.Callback):
