@@ -1,4 +1,5 @@
 import tensorflow as tf
+import tensorflow_addons as tfa
 import re
 
 
@@ -7,12 +8,18 @@ class SAMOptimizer(tf.keras.optimizers.Optimizer):
        See https://arxiv.org/abs/2010.01412 for more details.
        This algorithm achieves state of the art performance on image classification
        tasks, and could potentially boost performance for face recognition as well'''
-    def __init__(self, rho, base_optimizer, name=None, **kwargs):
+    def __init__(self, rho=0.05, base_optimizer, name=None, **kwargs):
         super(SAMOptimizer, self).__init__(name=name)
         assert rho >= 0, "[ERROR] rho not defined correctly"
 
         self._rho = rho
-        self.base_optimizer = base_optimizer
+        if base_optimizer is not None:
+            self.base_optimizer = base_optimizer
+        else:
+            self.base_optimizer = tfa.optimizers.SGDW(learning_rate=0.01,
+                                                      weight_decay=1e-6,
+                                                      momentum=0.9,
+                                                      nesterov=True)
 
     def apply_gradients(self, grads_and_vars, global_step=None, name=None):
         raise NotImplementedError("SAM requires a custom training loop")
@@ -37,7 +44,7 @@ class SAMOptimizer(tf.keras.optimizers.Optimizer):
     @tf.function
     def second_step(self, grads, model, perturbations, name=None):
         new_grads = list()
-        for i, pair in ennumerate(zip(grads, model.trainable_weights)):
+        for i, pair in enumerate(zip(grads, model.trainable_weights)):
             grad, param = pair
             if grad is None or param is None:
                 continue
@@ -59,6 +66,5 @@ class SAMOptimizer(tf.keras.optimizers.Optimizer):
         return param_name
 
     @tf.function
-    def _grad_norm(self, grads_and_vars):
-        grads = [g for g, v in grads_and_vars]
+    def _grad_norm(self, grads):
         return tf.linalg.global_norm(grads)
