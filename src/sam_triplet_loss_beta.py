@@ -259,7 +259,10 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                     loss_value = loss_fn(y_batch_train, logits)
                 grads = tape.gradient(loss_value, model.trainable_weights)
                 perturbations = opt.first_step(grads, model)
-                tape.gradient(loss_value, model.trainable_weights)
+                with tf.GradientTape() as tape:
+                    logits = model(x_batch_train, training=True)
+                    loss_value = loss_fn(y_batch_train, logits)
+                grads = tape.gradient(loss_value, model.trainable_weights)
                 opt.second_step(grads, model, perturbations)
                 losses.append(float(loss_value))
                 lrs.append(opt.base_optimizer.lr.numpy())
@@ -315,7 +318,10 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                     loss_value = loss_fn(y_batch_train, logits)
                 grads = tape.gradient(loss_value, model.trainable_weights)
                 perturbations = opt.first_step(grads, model)
-                tape.gradient(loss_value, model.trainable_weights)
+                with tf.GradientTape() as tape:
+                    logits = model(x_batch_train, training=True)
+                    loss_value = loss_fn(y_batch_train, logits)
+                grads = tape.gradient(loss_value, model.trainable_weights)
                 opt.second_step(grads, model, perturbations)
                 if step % 200 == 0:
                     print("Step : %d :: Current loss : %f" % (step, float(loss_value)))

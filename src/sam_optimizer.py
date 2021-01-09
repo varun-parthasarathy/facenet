@@ -29,9 +29,9 @@ class SAMOptimizer(tf.keras.optimizers.Optimizer):
         grad_norm = self._grad_norm(grads)
         scale = self._rho / tf.math.add(grad_norm, 1e-12)
         perturbations = dict()
-        param_name = self._get_variable_name(param.name)
         for i, pair in enumerate(zip(grads, model.trainable_weights)):
             grad, param = pair
+            param_name = self._get_variable_name(param.name)
             if grad is None or param is None:
                 perturbations[param_name] = None
                 continue
