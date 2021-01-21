@@ -399,7 +399,7 @@ class TripletFocalLoss(LossFunctionWrapper):
                          distance_metric = distance_metric)
 
 
-class TripletBatchHardLoss(tf.keras.losses.Loss):
+class TripletBatchHardLoss(LossFunctionWrapper):
     """Computes the triplet loss with hard negative and hard positive mining.
     The loss encourages the maximum positive distance (between a pair of embeddings
     with the same labels) to be smaller than the minimum negative distance plus the
@@ -446,7 +446,7 @@ class TripletBatchHardLoss(tf.keras.losses.Loss):
                          distance_metric = distance_metric)
 
 
-class TripletBatchHardV2Loss(tf.keras.losses.Loss):
+class TripletBatchHardV2Loss(LossFunctionWrapper):
     """Computes the triplet loss with hard negative and hard positive mining.
     The loss encourages the maximum positive distance (between a pair of embeddings
     with the same labels) to be smaller than the minimum negative distance plus the
