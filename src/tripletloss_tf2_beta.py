@@ -177,7 +177,8 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                                                  use_mixed_precision=use_mixed_precision,
                                                                  images_per_person=images_per_person,
                                                                  people_per_sample=people_per_sample,
-                                                                 use_tpu=use_tpu)
+                                                                 use_tpu=use_tpu,
+                                                                 model_type=model_type)
 
     if len(test_path) > 1:
         if use_lfw is True:
@@ -188,7 +189,8 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                                            cache='./lfw_dataset_cache.tfcache',
                                                            use_mixed_precision=use_mixed_precision,
                                                            use_tpu=use_tpu,
-                                                           train_classes=n_classes)
+                                                           train_classes=n_classes,
+                                                           model_type=model_type)
         else:
             test_dataset, test_images, _ = get_test_dataset(data_path=test_path, 
                                                             image_size=image_size, 
@@ -197,7 +199,8 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                                             cache='./test_dataset_cache.tfcache',
                                                             use_mixed_precision=use_mixed_precision,
                                                             use_tpu=use_tpu,
-                                                            train_classes=n_classes)
+                                                            train_classes=n_classes,
+                                                            model_type=model_type)
     else:
         test_dataset = None
 

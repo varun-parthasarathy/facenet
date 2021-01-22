@@ -1,6 +1,7 @@
 import os
 import cv2
 import pathlib
+import importlib
 import numpy as np
 import tensorflow as tf
 import tensorflow_addons as tfa
@@ -55,15 +56,39 @@ def _read_pairs(pairs_filename):
 #-----------------------------------------------------------------------------------------------------------------
 #-----------------------------------------------------------------------------------------------------------------
 
+def _get_preprocessor(model_type):
+    if model_type[0:6] == 'resnet':
+        preprocessor = 'tensorflow.keras.applications.resnet'
+    elif model_type[0:13] == 'efficientnet':
+        preprocessor = 'tensorflow.keras.applications.efficientnet'
+    elif model_type == 'xception':
+        preprocessor = 'tensorflow.keras.applications.xception'
+    elif model_type == 'inception_v3':
+        preprocessor = 'tensorflow.keras.applications.inception_v3'
+    elif model_type == 'inception_resnet_v2':
+        preprocessor = 'tensorflow.keras.applications.inception_resnet_v2'
+    elif model_type == 'mobilenet':
+        preprocessor = 'tensorflow.keras.applications.mobilenet'
+    elif model_type == 'mobilenet_v2':
+        preprocessor = 'tensorflow.keras.applications.mobilenet_v2'
+    else:
+        preprocessor = None
+
+    if preprocessor is not None:
+        preprocessor = importlib.import_module(preprocessor)
+
+    return preprocessor
+
 def generate_training_dataset(data_path, image_size, batch_size, crop_size, cache='',
                               use_mixed_precision=False, images_per_person=35, people_per_sample=50, 
-                              use_tpu=False):
+                              use_tpu=False, model_type=None):
     data_path = pathlib.Path(data_path)
     AUTOTUNE = tf.data.experimental.AUTOTUNE
     CLASS_NAMES = [item.name for item in data_path.glob('*') if item.is_dir()]
     CLASS_NAMES.sort()
     CLASS_NAMES = np.array(CLASS_NAMES)
     image_count = len(list(data_path.glob('*/*')))
+    preprocessor = _get_preprocessor(model_type)
 
     classes_ds = tf.data.Dataset.list_files(str(data_path/'*/'))
 
@@ -87,12 +112,15 @@ def generate_training_dataset(data_path, image_size, batch_size, crop_size, cach
         label = get_label(file_path)
         img = tf.io.read_file(file_path)
         img = decode_img(img)
+        if preprocessor is not None:
+            img = preprocessor.preprocess_input(img)
+        else:
+            img = img / 255.
         img = tf.image.random_crop(img, [crop_size, crop_size, 3])
         img = tf.image.random_flip_left_right(img)
         img = tf.image.random_brightness(img, 0.2)
         img = tf.image.random_contrast(img, 0.0, 0.2)
         img = tf.image.random_jpeg_quality(img, 70, 100)
-        img = img / 255.0
         return img, label
 
     def parse_class(class_path):
@@ -115,7 +143,7 @@ def generate_training_dataset(data_path, image_size, batch_size, crop_size, cach
 
 
 def get_test_dataset(data_path, image_size, batch_size, crop_size, cache='', train_classes=0,
-                     use_mixed_precision=False, use_tpu=False):
+                     use_mixed_precision=False, use_tpu=False, model_type=None):
     data_path = pathlib.Path(data_path)
     AUTOTUNE = tf.data.experimental.AUTOTUNE
     assert batch_size % 2 == 0, '[ERROR] Batch size must be a multiple of 2'
@@ -123,6 +151,7 @@ def get_test_dataset(data_path, image_size, batch_size, crop_size, cache='', tra
     CLASS_NAMES.sort()
     CLASS_NAMES = np.array(CLASS_NAMES)
     image_count = len(CLASS_NAMES)*3
+    preprocessor = _get_preprocessor(model_type)
 
     classes_ds = tf.data.Dataset.list_files(str(data_path/'*/'))
 
@@ -146,9 +175,12 @@ def get_test_dataset(data_path, image_size, batch_size, crop_size, cache='', tra
         label = get_label(file_path)
         img = tf.io.read_file(file_path)
         img = decode_img(img)
+        if preprocessor is not None:
+            img = preprocessor.preprocess_input(img)
+        else:
+            img = img / 255.
         img = tf.image.random_crop(img, [crop_size, crop_size, 3])
         img = tf.image.random_flip_left_right(img)
-        img = img / 255.0
         return img, label
 
     def parse_class(class_path):
@@ -170,7 +202,7 @@ def get_test_dataset(data_path, image_size, batch_size, crop_size, cache='', tra
 
 
 def get_LFW_dataset(data_path, image_size, batch_size, crop_size, cache='', train_classes=0,
-                    use_mixed_precision=False, use_tpu=False):
+                    use_mixed_precision=False, use_tpu=False, model_type=None):
     AUTOTUNE = tf.data.experimental.AUTOTUNE
     assert batch_size % 2 == 0, '[ERROR] Batch size must be a multiple of 2'
     pairs = _read_pairs('./data/pairs.txt')
@@ -178,6 +210,7 @@ def get_LFW_dataset(data_path, image_size, batch_size, crop_size, cache='', trai
     CLASS_NAMES.sort()
     CLASS_NAMES = np.array(CLASS_NAMES)
     image_count = len(path_list)
+    preprocessor = _get_preprocessor(model_type)
 
     ds = tf.data.Dataset.from_tensor_slices(path_list)
 
@@ -201,9 +234,12 @@ def get_LFW_dataset(data_path, image_size, batch_size, crop_size, cache='', trai
         label = get_label(file_path)
         img = tf.io.read_file(file_path)
         img = decode_img(img)
+        if preprocessor is not None:
+            img = preprocessor.preprocess_input(img)
+        else:
+            img = img / 255.
         img = tf.image.random_crop(img, [crop_size, crop_size, 3])
         img = tf.image.random_flip_left_right(img)
-        img = img / 255.0
         return img, label
 
     ds = ds.map(process_path, num_parallel_calls=AUTOTUNE)
