@@ -156,7 +156,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                 checkpoint_path, range_test=False, use_tpu=False, tpu_name=None, test_path='',
                 use_mixed_precision=False, triplet_strategy='', images_per_person=35, 
                 people_per_sample=12, pretrained_model='', distance_metric="L2", soft=True, 
-                sigma=0.3, use_lfw=True):
+                sigma=0.3, use_lfw=True, distributed=False):
 
     if use_tpu is True:
         assert tpu_name is not None, '[ERROR] TPU name must be specified'
@@ -173,6 +173,10 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
             policy = mixed_precision.Policy('mixed_float16')
         mixed_precision.set_policy(policy)
         print("[INFO] Using mixed precision for training. This will reduce memory consumption\n")
+
+    if distributed is True and use_tpu is False:
+        mirrored_strategy = tf.distribute.MirroredStrategy()
+        print("[INFO] Using distributed training strategy on GPU")
 
     train_dataset, n_imgs, n_classes = generate_training_dataset(data_path=data_path, 
                                                                  image_size=image_size, 
@@ -229,6 +233,28 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
 
     triplet_loss_metrics = TripletLossMetrics(test_images, embedding_size)
 
+#-------------------------------------------------------------------------------------------------------
+    def train_step(x_batch_train, y_batch_train):
+        with tf.GradientTape() as tape:
+            logits = model(x_batch_train, training=True)
+            loss_value = loss_fn(y_batch_train, logits)
+        grads = tape.gradient(loss_value, model.trainable_weights)
+        perturbations = opt.first_step(grads, model)
+        with tf.GradientTape() as tape:
+            logits = model(x_batch_train, training=True)
+            loss_value = loss_fn(y_batch_train, logits)
+        grads = tape.gradient(loss_value, model.trainable_weights)
+        opt.second_step(grads, model, perturbations)
+
+        return loss_value
+
+    @tf.function
+    def distributed_train_step(x_batch_train, y_batch_train):
+        per_replica_loss = mirrored_strategy.run(train_step, args=(x_batch_train, y_batch_train, ))
+        return mirrored_strategy.reduce(tf.distribute.ReduceOp.SUM, per_replica_losses,
+                                        axis=None)
+#-------------------------------------------------------------------------------------------------------
+
     if range_test is True:
         range_finder = RangeTestCallback(start_lr=1e-5,
                                          end_lr=10)
@@ -241,6 +267,16 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                               embedding_size=embedding_size)
                 assert model is not None, '[ERROR] There was a problem while loading the pre-trained weights'
 
+        elif distributed is True and use_tpu is False:
+            with mirrored_strategy.scope():
+                model = create_neural_network(model_type=model_type,
+                                              embedding_size=embedding_size)
+                opt = get_optimizer(optimizer_name=optimizer,
+                                    lr_schedule=1e-5,
+                                    weight_decay=weight_decay)
+            train_dataset = mirrored_strategy.experimental_distribute_dataset(train_dataset)
+            test_dataset = mirrored_strategy.experimental_distribute_dataset(test_dataset)
+            assert model is not None, '[ERROR] There was a problem while loading the pre-trained weights'
         else:
             model = create_neural_network(model_type=model_type,
                                           embedding_size=embedding_size)
@@ -254,16 +290,10 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
         losses = []
         for epoch in range(5):
             for step, (x_batch_train, y_batch_train) in enumerate(train_dataset):
-                with tf.GradientTape() as tape:
-                    logits = model(x_batch_train, training=True)
-                    loss_value = loss_fn(y_batch_train, logits)
-                grads = tape.gradient(loss_value, model.trainable_weights)
-                perturbations = opt.first_step(grads, model)
-                with tf.GradientTape() as tape:
-                    logits = model(x_batch_train, training=True)
-                    loss_value = loss_fn(y_batch_train, logits)
-                grads = tape.gradient(loss_value, model.trainable_weights)
-                opt.second_step(grads, model, perturbations)
+                if distributed is True and use_tpu is False:
+                    loss_value = distributed_train_step(x_batch_train, y_batch_train)
+                else:
+                    loss_value = train_step(x_batch_train, y_batch_train)
                 losses.append(float(loss_value))
                 lrs.append(opt.base_optimizer.lr.numpy())
                 if step % 200 == 0:
@@ -305,7 +335,16 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                 model = create_neural_network(model_type=model_type,
                                               embedding_size=embedding_size)
                 assert model is not None, '[ERROR] There was a problem while loading the pre-trained weights'
-
+        elif distributed is True and use_tpu is False:
+            with mirrored_strategy.scope():
+                model = create_neural_network(model_type=model_type,
+                                              embedding_size=embedding_size)
+                opt = get_optimizer(optimizer_name=optimizer,
+                                    lr_schedule=lr_schedule,
+                                    weight_decay=weight_decay)
+            train_dataset = mirrored_strategy.experimental_distribute_dataset(train_dataset)
+            test_dataset = mirrored_strategy.experimental_distribute_dataset(test_dataset)
+            assert model is not None, '[ERROR] There was a problem while loading the pre-trained weights'
         else:
             model = create_neural_network(model_type=model_type,
                                           embedding_size=embedding_size)
@@ -313,16 +352,10 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
 
         for epoch in range(num_epochs):
             for step, (x_batch_train, y_batch_train) in enumerate(train_dataset):
-                with tf.GradientTape() as tape:
-                    logits = model(x_batch_train, training=True)
-                    loss_value = loss_fn(y_batch_train, logits)
-                grads = tape.gradient(loss_value, model.trainable_weights)
-                perturbations = opt.first_step(grads, model)
-                with tf.GradientTape() as tape:
-                    logits = model(x_batch_train, training=True)
-                    loss_value = loss_fn(y_batch_train, logits)
-                grads = tape.gradient(loss_value, model.trainable_weights)
-                opt.second_step(grads, model, perturbations)
+                if distributed is True and use_tpu is False:
+                    loss_value = distributed_train_step(x_batch_train, y_batch_train)
+                else:
+                    loss_value = train_step(x_batch_train, y_batch_train)
                 if step % 200 == 0:
                     print("Step : %d :: Current loss : %f" % (step, float(loss_value)))
             for x_batch_test, y_batch_test in test_dataset:

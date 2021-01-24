@@ -1,4 +1,5 @@
 import os
+import re
 import cv2
 import pathlib
 import argparse
@@ -9,6 +10,7 @@ import tensorflow_addons as tfa
 import matplotlib.pyplot as plt
 import cyclic_learning_rate as clr
 from scipy.signal import savgol_filter
+from sam_optimizer import SAMOptimizer
 from tensorflow.keras.models import Model
 from tensorflow.keras.applications.resnet import *
 from tensorflow.keras.applications.efficientnet import *
@@ -20,7 +22,7 @@ from tensorflow.keras.applications.inception_resnet_v2 import InceptionResNetV2
 from tensorflow.keras.mixed_precision import experimental as mixed_precision
 from custom_triplet_loss import TripletBatchHardLoss, TripletFocalLoss, TripletBatchHardV2Loss
 from dataset_utils import generate_training_dataset, get_test_dataset, get_LFW_dataset
-from triplet_callbacks_and_metrics import RangeTestCallback, DecayMarginCallback, TripletLossMetrics
+from triplet_callbacks_and_metrics import TripletLossMetrics
 
 
 def create_neural_network(model_type='resnet50', embedding_size=512, input_shape=None, weights_path=''):
@@ -144,6 +146,9 @@ def get_optimizer(optimizer_name, lr_schedule, weight_decay=1e-6):
 
     assert opt is not None, '[ERROR] The optimizer is not specified correctly'
 
+    opt = SAMOptimizer(rho=0.05,
+                       base_optimizer=opt)
+
     return opt
 
 def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, init_lr, max_lr, weight_decay, 
@@ -151,7 +156,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                 checkpoint_path, range_test=False, use_tpu=False, tpu_name=None, test_path='',
                 use_mixed_precision=False, triplet_strategy='', images_per_person=35, 
                 people_per_sample=12, pretrained_model='', distance_metric="L2", soft=True, 
-                sigma=0.3, decay_margin_rate=0.0, use_lfw=True, target_margin=0.2, distributed=False):
+                sigma=0.3, use_lfw=True, distributed=False):
 
     if use_tpu is True:
         assert tpu_name is not None, '[ERROR] TPU name must be specified'
@@ -181,8 +186,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                                                  use_mixed_precision=use_mixed_precision,
                                                                  images_per_person=images_per_person,
                                                                  people_per_sample=people_per_sample,
-                                                                 use_tpu=use_tpu,
-                                                                 model_type=model_type)
+                                                                 use_tpu=use_tpu)
 
     if len(test_path) > 1:
         if use_lfw is True:
@@ -193,8 +197,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                                            cache='./lfw_dataset_cache.tfcache',
                                                            use_mixed_precision=use_mixed_precision,
                                                            use_tpu=use_tpu,
-                                                           train_classes=n_classes,
-                                                           model_type=model_type)
+                                                           train_classes=n_classes)
         else:
             test_dataset, test_images, _ = get_test_dataset(data_path=test_path, 
                                                             image_size=image_size, 
@@ -203,13 +206,13 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                                             cache='./test_dataset_cache.tfcache',
                                                             use_mixed_precision=use_mixed_precision,
                                                             use_tpu=use_tpu,
-                                                            train_classes=n_classes,
-                                                            model_type=model_type)
+                                                            train_classes=n_classes)
     else:
         test_dataset = None
 
     if triplet_strategy == 'VANILLA':
-        loss_fn = tfa.losses.TripletSemiHardLoss(margin=margin)
+        loss_fn = tfa.losses.TripletSemiHardLoss(margin=margin,
+                                                 reduction=tf.keras.losses.Reduction.NONE)
         print('[INFO] Using vanilla triplet loss')
     elif triplet_strategy == 'BATCH_HARD':
         loss_fn = TripletBatchHardLoss(margin=margin,
@@ -229,14 +232,29 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                    distance_metric=distance_metric)
         print('[INFO] Using triplet focal loss.')
 
-    if decay_margin_rate > 0 and triplet_strategy != 'BATCH_HARD_V2':
-        decay_margin_callback = DecayMarginCallback(loss_fn, decay_margin_rate, 
-                                                    margin, target_margin)
-        print('[INFO] Using decayed margin to reduce intra-class variability (experimental)')
-    else:
-        decay_margin_callback = None
-
     triplet_loss_metrics = TripletLossMetrics(test_images, embedding_size)
+
+#-------------------------------------------------------------------------------------------------------
+    def train_step(x_batch_train, y_batch_train):
+        with tf.GradientTape() as tape:
+            logits = model(x_batch_train, training=True)
+            loss_value = loss_fn(y_batch_train, logits)
+        grads = tape.gradient(loss_value, model.trainable_weights)
+        perturbations = opt.first_step(grads, model)
+        with tf.GradientTape() as tape:
+            logits = model(x_batch_train, training=True)
+            loss_value = loss_fn(y_batch_train, logits)
+        grads = tape.gradient(loss_value, model.trainable_weights)
+        opt.second_step(grads, model, perturbations)
+
+        return loss_value
+
+    @tf.function
+    def distributed_train_step(x_batch_train, y_batch_train):
+        per_replica_loss = mirrored_strategy.run(train_step, args=(x_batch_train, y_batch_train, ))
+        return mirrored_strategy.reduce(tf.distribute.ReduceOp.SUM, per_replica_losses,
+                                        axis=None)
+#-------------------------------------------------------------------------------------------------------
 
     if range_test is True:
         range_finder = RangeTestCallback(start_lr=1e-5,
@@ -249,39 +267,49 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                 model = create_neural_network(model_type=model_type,
                                               embedding_size=embedding_size)
                 assert model is not None, '[ERROR] There was a problem while loading the pre-trained weights'
-                model.compile(optimizer=opt,
-                              loss=loss_fn,
-                              metrics=[triplet_loss_metrics])
+
         elif distributed is True and use_tpu is False:
             with mirrored_strategy.scope():
                 model = create_neural_network(model_type=model_type,
                                               embedding_size=embedding_size)
                 opt = get_optimizer(optimizer_name=optimizer,
                                     lr_schedule=1e-5,
-                                    weight_decay=weight_decay) # Optimizer must be created within scope!
-                assert model is not None, '[ERROR] There was a problem while loading the pre-trained weights'
-                model.compile(optimizer=opt,
-                              loss=loss_fn,
-                              metrics=[triplet_loss_metrics])
+                                    weight_decay=weight_decay)
+            train_dataset = mirrored_strategy.experimental_distribute_dataset(train_dataset)
+            test_dataset = mirrored_strategy.experimental_distribute_dataset(test_dataset)
+            assert model is not None, '[ERROR] There was a problem while loading the pre-trained weights'
         else:
             model = create_neural_network(model_type=model_type,
-                                              embedding_size=embedding_size)
+                                          embedding_size=embedding_size)
             assert model is not None, '[ERROR] There was a problem while loading the pre-trained weights'
-            model.compile(optimizer=opt,
-                          loss=loss_fn,
-                          metrics=[triplet_loss_metrics])
 
         callback_list = [range_finder]
         if decay_margin_callback is not None:
             callback_list.append(decay_margin_callback)
 
-        train_history = model.fit(train_dataset, epochs=5, 
-                                  callbacks=callback_list, 
-                                  validation_data=test_dataset)
+        lrs = []
+        losses = []
+        for epoch in range(5):
+            for step, (x_batch_train, y_batch_train) in enumerate(train_dataset):
+                if distributed is True and use_tpu is False:
+                    loss_value = distributed_train_step(x_batch_train, y_batch_train)
+                else:
+                    loss_value = train_step(x_batch_train, y_batch_train)
+                losses.append(float(loss_value))
+                lrs.append(opt.base_optimizer.lr.numpy())
+                if step % 200 == 0:
+                    print("Step : %d :: Current loss : %f" % (step, float(loss_value)))
+            for x_batch_test, y_batch_test in test_dataset:
+                val_logits = model(x_batch_test, training=False)
+                triplet_loss_metrics.update_state(y_batch_test, val_logits)
+            result = triplet_loss_metrics.result()
+            print(str(result))
+            triplet_loss_metrics.reset_states()
+
         plt.xscale('log')
-        plt.plot(train_history.lrs, train_history.losses, color='blue')
+        plt.plot(lrs, losses, color='blue')
         smooth_losses = savgol_filter(train_history.losses, 5)
-        plt.plot(train_history.lrs, smooth_losses, color='red')
+        plt.plot(lrs, smooth_losses, color='red')
         plt.xlabel('Log learning rate')
         plt.ylabel('Loss')
         plt.savefig('./range_test_result.png')
@@ -302,48 +330,43 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
             os.mkdir(checkpoint_path)
 
         checkpoint_name = checkpoint_path + '/' + 'cp-{epoch:03d}.ckpt'
-        checkpoint_saver = tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_name,
-                                                              save_weights_only=True,
-                                                              monitor='val_loss',
-                                                              mode='min',
-                                                              save_best_only=False,
-                                                              #save_freq='epoch')
-                                                              period=5) # WARNING - Deprecated argument!
+        
         if use_tpu is True:
             with strategy.scope():
                 model = create_neural_network(model_type=model_type,
                                               embedding_size=embedding_size)
-                assert model is not None, '[ERROR] There was a problem in loading the pre-trained weights'
-                model.compile(optimizer=opt,
-                              loss=loss_fn,
-                              metrics=[triplet_loss_metrics])
+                assert model is not None, '[ERROR] There was a problem while loading the pre-trained weights'
         elif distributed is True and use_tpu is False:
             with mirrored_strategy.scope():
                 model = create_neural_network(model_type=model_type,
                                               embedding_size=embedding_size)
                 opt = get_optimizer(optimizer_name=optimizer,
                                     lr_schedule=lr_schedule,
-                                    weight_decay=weight_decay) # Optimizer must be created within scope!
-                assert model is not None, '[ERROR] There was a problem in loading the pre-trained weights'
-                model.compile(optimizer=opt,
-                              loss=loss_fn,
-                              metrics=[triplet_loss_metrics])
+                                    weight_decay=weight_decay)
+            train_dataset = mirrored_strategy.experimental_distribute_dataset(train_dataset)
+            test_dataset = mirrored_strategy.experimental_distribute_dataset(test_dataset)
+            assert model is not None, '[ERROR] There was a problem while loading the pre-trained weights'
         else:
             model = create_neural_network(model_type=model_type,
-                                              embedding_size=embedding_size)
-            assert model is not None, '[ERROR] There was a problem in loading the pre-trained weights'
-            model.compile(optimizer=opt,
-                          loss=loss_fn,
-                          metrics=[triplet_loss_metrics])
+                                          embedding_size=embedding_size)
+            assert model is not None, '[ERROR] There was a problem while loading the pre-trained weights'
 
-        callback_list = [checkpoint_saver]
-        if decay_margin_callback is not None:
-            callback_list.append(decay_margin_callback)
-
-        train_history = model.fit(train_dataset, 
-                                  epochs=num_epochs, 
-                                  callbacks=callback_list, 
-                                  validation_data=test_dataset)
+        for epoch in range(num_epochs):
+            for step, (x_batch_train, y_batch_train) in enumerate(train_dataset):
+                if distributed is True and use_tpu is False:
+                    loss_value = distributed_train_step(x_batch_train, y_batch_train)
+                else:
+                    loss_value = train_step(x_batch_train, y_batch_train)
+                if step % 200 == 0:
+                    print("Step : %d :: Current loss : %f" % (step, float(loss_value)))
+            for x_batch_test, y_batch_test in test_dataset:
+                val_logits = model(x_batch_test, training=False)
+                triplet_loss_metrics.update_state(y_batch_test, val_logits)
+            result = triplet_loss_metrics.result()
+            print(str(result))
+            triplet_loss_metrics.reset_states()
+            if epoch % 5 == 0:
+                model.save(checkpoint_name.format(epoch))
         
         if not os.path.exists('./results'):
             os.mkdir('./results')
@@ -418,14 +441,9 @@ if __name__ == '__main__':
                         help='Use soft margin for BATCH_HARD strategy')
     parser.add_argument('--sigma', type=float, required=False, default=0.3,
                         help='Value of sigma for FOCAL strategy')
-    parser.add_argument('--decay_margin_rate', type=float, required=False, default=0.0,
-                        help='Decay rate for margin. Recommended value to set is 0.9965')
     parser.add_argument('--use_lfw', action='store_true',
                         help='Specifies whether test dataset is the LFW dataset or not')
-    parser.add_argument('--target_margin', type=float, default=0.2, required=False,
-                        help='Minimum margin when using decayed margin')
-    parser.add_argument('--distributed', action='store_true',
-                        help='Use distributed training strategy for multiple GPUs. Does not work with TPU')
+
 
     args = vars(parser.parse_args())
 
@@ -456,7 +474,4 @@ if __name__ == '__main__':
                 distance_metric=args['distance_metric'],
                 soft=args['soft'],
                 sigma=args['sigma'],
-                decay_margin_rate=args['decay_margin_rate'],
-                use_lfw=args['use_lfw'],
-                target_margin=args['target_margin'],
-                distributed=args['distributed'])
+                use_lfw=args['use_lfw'])
