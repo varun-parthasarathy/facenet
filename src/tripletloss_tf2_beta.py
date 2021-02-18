@@ -11,6 +11,7 @@ import cyclic_learning_rate as clr
 from scipy.signal import savgol_filter
 from tensorflow.keras.models import Model
 from tensorflow.keras.applications.resnet import *
+from adaptive_triplet_loss import AdaptiveTripletLoss
 from tensorflow.keras.applications.efficientnet import *
 from tensorflow.keras.applications.xception import Xception
 from tensorflow.keras.applications.mobilenet import MobileNet
@@ -222,6 +223,11 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                          beta=0.002,
                                          distance_metric=distance_metric)
         print('[INFO] Using batch-hard V2 strategy')
+    elif triplet_strategy == 'ADAPTIVE':
+        loss_fn = AdaptiveTripletLoss(margin=margin,
+                                      soft=soft,
+                                      lambda_=sigma)
+        print('[INFO] Using Adaptive Triplet Loss')
     else:
         loss_fn = TripletFocalLoss(margin=margin,
                                    sigma=sigma,
@@ -403,7 +409,7 @@ if __name__ == '__main__':
     parser.add_argument('--use_mixed_precision', action='store_true',
                         help='Use mixed precision for training. Can greatly reduce memory consumption')
     parser.add_argument('--triplet_strategy', type=str, default='FOCAL',
-                        choices=['VANILLA', 'BATCH_HARD', 'BATCH_HARD_V2', 'FOCAL'],
+                        choices=['VANILLA', 'BATCH_HARD', 'BATCH_HARD_V2', 'FOCAL', 'ADAPTIVE'],
                         help='Choice of triplet loss formulation. Default is FOCAL')
     parser.add_argument('--images_per_person', required=False, type=int, default=35,
                         help='Average number of images per class. Default is 35 (from MS1M cleaned + AsianCeleb)')
@@ -417,7 +423,7 @@ if __name__ == '__main__':
     parser.add_argument('--soft', action='store_true',
                         help='Use soft margin for BATCH_HARD strategy')
     parser.add_argument('--sigma', type=float, required=False, default=0.3,
-                        help='Value of sigma for FOCAL strategy')
+                        help='Value of sigma for FOCAL strategy. For ADAPTIVE strategy, specifies lambda')
     parser.add_argument('--decay_margin_rate', type=float, required=False, default=0.0,
                         help='Decay rate for margin. Recommended value to set is 0.9965')
     parser.add_argument('--use_lfw', action='store_true',
