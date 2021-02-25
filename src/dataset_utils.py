@@ -99,7 +99,8 @@ def generate_training_dataset(data_path, image_size, batch_size, crop_size, cach
         return tf.argmax(parts[-2] == CLASS_NAMES)
 
     def decode_img(img):
-        img = tf.io.decode_image(img, channels=3)
+        #img = tf.io.decode_image(img, channels=3, expand_animations=False)
+        img = tf.io.decode_png(img)
         if use_mixed_precision is True:
             if use_tpu is True:
                 img = tf.cast(img, tf.bfloat16)
@@ -157,7 +158,8 @@ def get_test_dataset(data_path, image_size, batch_size, crop_size, cache='', tra
         return tf.argmax(parts[-2] == CLASS_NAMES) + train_classes
 
     def decode_img(img):
-        img = tf.io.decode_image(img, channels=3)
+        #img = tf.io.decode_image(img, channels=3, expand_animations=False)
+        img = tf.io.decode_png(img)
         if use_mixed_precision is True:
             if use_tpu is True:
                 img = tf.cast(img, tf.bfloat16)
