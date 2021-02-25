@@ -130,7 +130,8 @@ def generate_training_dataset(data_path, image_size, batch_size, crop_size, cach
     if len(cache) > 1:
         ds = ds.cache(cache)
     ds = ds.shuffle(batches+1, reshuffle_each_iteration=True)
-    ds = ds.map(process_path, num_parallel_calls=AUTOTUNE).unbatch()
+    ds = ds.unbatch()
+    ds = ds.map(process_path, num_parallel_calls=AUTOTUNE)
     ds = ds.batch(batch_size).map(lambda x: tf.random.shuffle(x), num_parallel_calls=AUTOTUNE)
     #ds = ds.repeat() # Is this needed?
     ds = ds.prefetch(AUTOTUNE)
@@ -184,7 +185,8 @@ def get_test_dataset(data_path, image_size, batch_size, crop_size, cache='', tra
     if len(cache) > 1:
         ds = ds.cache(cache)
     ds = ds.shuffle(1024, reshuffle_each_iteration=False)
-    ds = ds.map(process_path, num_parallel_calls=AUTOTUNE).unbatch()
+    ds = ds.unbatch()
+    ds = ds.map(process_path, num_parallel_calls=AUTOTUNE)
     ds = ds.batch(batch_size)
     ds = ds.prefetch(AUTOTUNE)
 
