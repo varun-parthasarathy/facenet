@@ -124,7 +124,7 @@ def generate_training_dataset(data_path, image_size, batch_size, crop_size, cach
         return img, label
 
     def parse_class(class_path):
-        class_path = pathlib.Path(class_path)
+        class_path = pathlib.Path(class_path.numpy()[0])
         return tf.data.Dataset.list_files(str(class_path/'*.jpg'), shuffle=True)
 
     if len(cache) > 1:
@@ -184,7 +184,7 @@ def get_test_dataset(data_path, image_size, batch_size, crop_size, cache='', tra
         return img, label
 
     def parse_class(class_path):
-        class_path = pathlib.Path(class_path)
+        class_path = pathlib.Path(class_path.numpy()[0])
         return tf.data.Dataset.list_files(str(class_path/'*.jpg'), shuffle=True).take(3)
 
     if len(cache) > 1:
