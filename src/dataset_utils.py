@@ -84,12 +84,12 @@ def generate_training_dataset(data_path, image_size, batch_size, crop_size, cach
                               use_tpu=False, model_type=None):
     data_path = pathlib.Path(data_path)
     AUTOTUNE = tf.data.experimental.AUTOTUNE
-    CLASS_NAMES = [item.name for item in data_path.glob('*') if item.is_dir()]
+    CLASS_NAMES = [item.name for item in data_path.iterdir() if item.is_dir()]
     CLASS_NAMES.sort()
     CLASS_NAMES = np.array(CLASS_NAMES)
-    image_count = len(list(data_path.glob('*/*.jpg')))
+    image_count = len(list(data_path.glob('*/*.png')))
     batches = int(image_count / images_per_person)
-    print("[INFO] Image count in training dataset : %d", image_count)
+    print("[INFO] Image count in training dataset : %d" % (image_count))
     preprocessor = _get_preprocessor(model_type)
 
     #classes_ds = tf.data.Dataset.list_files(str(data_path/'*/'))
@@ -125,7 +125,7 @@ def generate_training_dataset(data_path, image_size, batch_size, crop_size, cach
         #img = tf.image.random_jpeg_quality(img, 70, 100)
         return img, label
 
-    ds = tf.data.Dataset.list_files(str(data_path/"*/*"), shuffle=False)
+    ds = tf.data.Dataset.list_files(str(data_path/"*/*.png"), shuffle=False)
     ds = ds.batch(images_per_person)
     if len(cache) > 1:
         ds = ds.cache(cache)
@@ -144,7 +144,7 @@ def get_test_dataset(data_path, image_size, batch_size, crop_size, cache='', tra
     data_path = pathlib.Path(data_path)
     AUTOTUNE = tf.data.experimental.AUTOTUNE
     assert batch_size % 2 == 0, '[ERROR] Batch size must be a multiple of 2'
-    CLASS_NAMES = [item.name for item in data_path.glob('*') if item.is_dir()]
+    CLASS_NAMES = [item.name for item in data_path.iterdir() if item.is_dir()]
     CLASS_NAMES.sort()
     CLASS_NAMES = np.array(CLASS_NAMES)
     image_count = len(CLASS_NAMES)*3
@@ -180,7 +180,7 @@ def get_test_dataset(data_path, image_size, batch_size, crop_size, cache='', tra
         img = tf.image.random_flip_left_right(img)
         return img, label
 
-    ds = tf.data.Dataset.list_files(str(data_path/"*/*"), shuffle=False)
+    ds = tf.data.Dataset.list_files(str(data_path/"*/*.png"), shuffle=False)
     ds = ds.batch(3)
     if len(cache) > 1:
         ds = ds.cache(cache)
