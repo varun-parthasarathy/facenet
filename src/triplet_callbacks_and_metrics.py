@@ -177,7 +177,7 @@ class RangeTestCallback(tf.keras.callbacks.Callback):
 
 
 class DecayMarginCallback(tf.keras.callbacks.Callback):
-    def __init__(self, loss_fn, decay_rate=0.9965, margin, target_margin=0.2):
+    def __init__(self, loss_fn, margin, decay_rate=0.9965, target_margin=0.2):
         super().__init__()
         self.margin = margin
         self.decay = decay_rate

@@ -236,8 +236,8 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
         print('[INFO] Using triplet focal loss.')
 
     if decay_margin_rate > 0 and triplet_strategy != 'BATCH_HARD_V2':
-        decay_margin_callback = DecayMarginCallback(loss_fn, decay_margin_rate, 
-                                                    margin, target_margin)
+        decay_margin_callback = DecayMarginCallback(loss_fn, margin, 
+                                                    decay_margin_rate, target_margin)
         print('[INFO] Using decayed margin to reduce intra-class variability (experimental)')
     else:
         decay_margin_callback = None

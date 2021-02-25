@@ -253,8 +253,6 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
             assert model is not None, '[ERROR] There was a problem while loading the pre-trained weights'
 
         callback_list = [range_finder]
-        if decay_margin_callback is not None:
-            callback_list.append(decay_margin_callback)
 
         lrs = []
         losses = []
