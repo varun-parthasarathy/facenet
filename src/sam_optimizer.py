@@ -8,7 +8,7 @@ class SAMOptimizer(tf.keras.optimizers.Optimizer):
        See https://arxiv.org/abs/2010.01412 for more details.
        This algorithm achieves state of the art performance on image classification
        tasks, and could potentially boost performance for face recognition as well'''
-    def __init__(self, rho=0.05, base_optimizer, name=None, **kwargs):
+    def __init__(self, base_optimizer, name=None, rho=0.05, **kwargs):
         super(SAMOptimizer, self).__init__(name=name)
         assert rho >= 0, "[ERROR] rho not defined correctly"
 
