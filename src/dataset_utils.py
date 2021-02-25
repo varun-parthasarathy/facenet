@@ -123,8 +123,12 @@ def generate_training_dataset(data_path, image_size, batch_size, crop_size, cach
         img = tf.image.random_jpeg_quality(img, 70, 100)
         return img, label
 
+    def parse_string_tensor(class_path: np.ndarray):
+        return class_path.numpy().decode('utf-8')[0]
+
     def parse_class(class_path):
-        #class_path = pathlib.Path(class_path.numpy()[0])
+        class_path = pathlib.Path(tf.numpy_function(func=parse_string_tensor, inp=[class_path],
+                                                    Tout=tf.string))
         return tf.data.Dataset.list_files(str(class_path/'*.jpg'), shuffle=True)
 
     if len(cache) > 1:
@@ -182,9 +186,13 @@ def get_test_dataset(data_path, image_size, batch_size, crop_size, cache='', tra
         img = tf.image.random_crop(img, [crop_size, crop_size, 3])
         img = tf.image.random_flip_left_right(img)
         return img, label
+        
+    def parse_string_tensor(class_path: np.ndarray):
+        return class_path.numpy().decode('utf-8')[0]
 
     def parse_class(class_path):
-        #class_path = pathlib.Path(class_path.numpy()[0])
+        class_path = pathlib.Path(tf.numpy_function(func=parse_string_tensor, inp=[class_path],
+                                                    Tout=tf.string))
         return tf.data.Dataset.list_files(str(class_path/'*.jpg'), shuffle=True).take(3)
 
     if len(cache) > 1:
