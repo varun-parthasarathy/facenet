@@ -94,7 +94,7 @@ def generate_training_dataset(data_path, image_size, batch_size, crop_size, cach
 
     def get_label(file_path):
         parts = tf.strings.split(file_path, os.path.sep)
-        return np.argmax(parts[-2] == CLASS_NAMES)
+        return tf.argmax(parts[-2] == CLASS_NAMES)
 
     def decode_img(img):
         img = tf.io.decode_image(img, channels=3)
@@ -124,7 +124,7 @@ def generate_training_dataset(data_path, image_size, batch_size, crop_size, cach
         return img, label
 
     def parse_class(class_path):
-        class_path = pathlib.Path(class_path.numpy()[0])
+        #class_path = pathlib.Path(class_path.numpy()[0])
         return tf.data.Dataset.list_files(str(class_path/'*.jpg'), shuffle=True)
 
     if len(cache) > 1:
@@ -157,7 +157,7 @@ def get_test_dataset(data_path, image_size, batch_size, crop_size, cache='', tra
 
     def get_label(file_path):
         parts = tf.strings.split(file_path, os.path.sep)
-        return np.argmax(parts[-2] == CLASS_NAMES) + train_classes
+        return tf.argmax(parts[-2] == CLASS_NAMES) + train_classes
 
     def decode_img(img):
         img = tf.io.decode_image(img, channels=3)
@@ -184,7 +184,7 @@ def get_test_dataset(data_path, image_size, batch_size, crop_size, cache='', tra
         return img, label
 
     def parse_class(class_path):
-        class_path = pathlib.Path(class_path.numpy()[0])
+        #class_path = pathlib.Path(class_path.numpy()[0])
         return tf.data.Dataset.list_files(str(class_path/'*.jpg'), shuffle=True).take(3)
 
     if len(cache) > 1:
@@ -216,7 +216,7 @@ def get_LFW_dataset(data_path, image_size, batch_size, crop_size, cache='', trai
 
     def get_label(file_path):
         parts = tf.strings.split(file_path, os.path.sep)
-        return np.argmax(parts[-2] == CLASS_NAMES) + train_classes
+        return tf.argmax(parts[-2] == CLASS_NAMES) + train_classes
 
     def decode_img(img):
         img = tf.io.decode_image(img, channels=3)
