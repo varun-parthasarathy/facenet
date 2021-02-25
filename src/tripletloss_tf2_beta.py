@@ -91,7 +91,7 @@ def create_neural_network(model_type='resnet50', embedding_size=512, input_shape
 
     return model
 
-def get_learning_rate_schedule(schedule_name, learning_rate=1e-3, max_lr=0.5, image_count, batch_size):
+def get_learning_rate_schedule(schedule_name, image_count, batch_size, learning_rate=1e-3, max_lr=0.5):
     lr = None
     if schedule_name == 'triangular2':
         lr = tfa.optimizers.Triangular2CyclicalLearningRate(initial_learning_rate=learning_rate,
@@ -383,10 +383,10 @@ if __name__ == '__main__':
                         choices=['RMSPROP', 'SGDW', 'ADAM', 'ADAGRAD', 'ADADELTA'],
                         help='Optimizer to use for training. Default is RMSprop')
     parser.add_argument('--model', required=False, type=str, default='inception_v3',
-                        choices=['resnet50', 'resnet101', 'resnet152', 'inception_v3', 'efficientnet_b0',/ 
-                                 'efficientnet_b1', 'efficientnet_b2', 'efficientnet_b3', 'efficientnet_b4',/ 
-                                 'efficientnet_b5', 'efficientnet_b6', 'efficientnet_b7', 'inception_resnet_v2',/ 
-                                 'xception', 'mobilenet', 'mobilenet_v2'],/
+                        choices=['resnet50', 'resnet101', 'resnet152', 'inception_v3', 'efficientnet_b0',
+                                 'efficientnet_b1', 'efficientnet_b2', 'efficientnet_b3', 'efficientnet_b4', 
+                                 'efficientnet_b5', 'efficientnet_b6', 'efficientnet_b7', 'inception_resnet_v2',
+                                 'xception', 'mobilenet', 'mobilenet_v2'],
                         help='NN architecture to use. Default is InceptionV3')
     parser.add_argument('--embedding_size', required=False, type=int, default=512,
                         help='Embedding size for triplet loss')
