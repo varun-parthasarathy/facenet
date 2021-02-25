@@ -87,10 +87,12 @@ def generate_training_dataset(data_path, image_size, batch_size, crop_size, cach
     CLASS_NAMES = [item.name for item in data_path.glob('*') if item.is_dir()]
     CLASS_NAMES.sort()
     CLASS_NAMES = np.array(CLASS_NAMES)
-    image_count = len(list(data_path.glob('*/*')))
+    image_count = len(list(data_path.glob('*/*.jpg')))
+    batches = int(image_count / images_per_person)
+    print("[INFO] Image count in training dataset : %d", image_count)
     preprocessor = _get_preprocessor(model_type)
 
-    classes_ds = tf.data.Dataset.list_files(str(data_path/'*/'))
+    #classes_ds = tf.data.Dataset.list_files(str(data_path/'*/'))
 
     def get_label(file_path):
         parts = tf.strings.split(file_path, os.path.sep)
@@ -120,22 +122,15 @@ def generate_training_dataset(data_path, image_size, batch_size, crop_size, cach
         img = tf.image.random_flip_left_right(img)
         img = tf.image.random_brightness(img, 0.2)
         img = tf.image.random_contrast(img, 0.0, 0.2)
-        img = tf.image.random_jpeg_quality(img, 70, 100)
+        #img = tf.image.random_jpeg_quality(img, 70, 100)
         return img, label
 
-    def parse_class(class_path):
-        class_path = pathlib.Path(class_path.numpy()[0])
-        return tf.data.Dataset.list_files(str(p/'*.jpg'), shuffle=True)
-
+    ds = tf.data.Dataset.list_files(str(data_path/"*/*"), shuffle=False)
+    ds = ds.batch(images_per_person)
     if len(cache) > 1:
-        classes_ds = classes_ds.cache(cache)
-    ds = classes_ds.shuffle(len(CLASS_NAMES), reshuffle_each_iteration=True)
-    ds = ds.interleave(lambda x: tf.data.Dataset.from_tensors(x).map(lambda y: tf.py_function(func=parse_class,
-                       inp=[y], Tout=tf.data.Dataset), num_parallel_calls=AUTOTUNE),
-                       cycle_length=len(CLASS_NAMES), block_length=images_per_person,
-                       num_parallel_calls=AUTOTUNE,
-                       deterministic=True)
-    ds = ds.map(process_path, num_parallel_calls=AUTOTUNE)
+        ds = ds.cache(cache)
+    ds = ds.shuffle(batches+1, reshuffle_each_iteration=True)
+    ds = ds.map(process_path, num_parallel_calls=AUTOTUNE).unbatch()
     ds = ds.batch(batch_size).map(lambda x: tf.random.shuffle(x), num_parallel_calls=AUTOTUNE)
     #ds = ds.repeat() # Is this needed?
     ds = ds.prefetch(AUTOTUNE)
@@ -154,7 +149,7 @@ def get_test_dataset(data_path, image_size, batch_size, crop_size, cache='', tra
     image_count = len(CLASS_NAMES)*3
     preprocessor = _get_preprocessor(model_type)
 
-    classes_ds = tf.data.Dataset.list_files(str(data_path/'*/'))
+    #classes_ds = tf.data.Dataset.list_files(str(data_path/'*/'))
 
     def get_label(file_path):
         parts = tf.strings.split(file_path, os.path.sep)
@@ -184,19 +179,12 @@ def get_test_dataset(data_path, image_size, batch_size, crop_size, cache='', tra
         img = tf.image.random_flip_left_right(img)
         return img, label
 
-    def parse_class(class_path):
-        class_path = pathlib.Path(class_path.numpy()[0])
-        return tf.data.Dataset.list_files(str(p/'*.jpg'), shuffle=True).take(3)
-
+    ds = tf.data.Dataset.list_files(str(data_path/"*/*"), shuffle=False)
+    ds = ds.batch(3)
     if len(cache) > 1:
-        classes_ds = classes_ds.cache(cache)
-    ds = classes_ds.shuffle(len(CLASS_NAMES), reshuffle_each_iteration=True)
-    ds = ds.interleave(lambda x: tf.data.Dataset.from_tensors(x).map(lambda y: tf.py_function(func=parse_class,
-                       inp=[y], Tout=tf.data.Dataset), num_parallel_calls=AUTOTUNE),
-                       cycle_length=len(CLASS_NAMES), block_length=2,
-                       num_parallel_calls=AUTOTUNE,
-                       deterministic=True)
-    ds = ds.map(process_path, num_parallel_calls=AUTOTUNE)
+        ds = ds.cache(cache)
+    ds = ds.shuffle(1024, reshuffle_each_iteration=False)
+    ds = ds.map(process_path, num_parallel_calls=AUTOTUNE).unbatch()
     ds = ds.batch(batch_size)
     ds = ds.prefetch(AUTOTUNE)
 
