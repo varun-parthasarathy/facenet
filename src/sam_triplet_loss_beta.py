@@ -153,8 +153,8 @@ def get_optimizer(optimizer_name, lr_schedule, weight_decay=1e-6):
     return opt
 
 def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, init_lr, max_lr, weight_decay, 
-                optimizer, model_type, embedding_size, cache_path=None, num_epochs, margin=0.35, 
-                checkpoint_path, range_test=False, use_tpu=False, tpu_name=None, test_path='',
+                optimizer, model_type, embedding_size, num_epochs, checkpoint_path, cache_path=None, margin=0.35, 
+                range_test=False, use_tpu=False, tpu_name=None, test_path='',
                 use_mixed_precision=False, triplet_strategy='', images_per_person=35, 
                 people_per_sample=12, pretrained_model='', distance_metric="L2", soft=True, 
                 sigma=0.3, use_lfw=True):
