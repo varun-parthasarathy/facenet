@@ -191,7 +191,7 @@ def get_test_dataset(data_path, image_size, batch_size, crop_size, cache='', tra
             p = class_path.eval(session=sess)
             p = p[0]
         p = pathlib.Path(p)
-        return tf.data.Dataset.list_files(str(class_path/'*.jpg'), shuffle=True).take(3)
+        return tf.data.Dataset.list_files(str(p/'*.jpg'), shuffle=True).take(3)
 
     if len(cache) > 1:
         classes_ds = classes_ds.cache(cache)
