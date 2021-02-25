@@ -130,7 +130,7 @@ def generate_training_dataset(data_path, image_size, batch_size, crop_size, cach
     if len(cache) > 1:
         classes_ds = classes_ds.cache(cache)
     ds = classes_ds.shuffle(len(CLASS_NAMES), reshuffle_each_iteration=True)
-    ds = ds.interleave(lambda x: tf.data.Dataset(x).map(parse_class, num_parallel_calls=AUTOTUNE),
+    ds = ds.interleave(lambda x: tf.data.Dataset.from_tensors(x).map(parse_class, num_parallel_calls=AUTOTUNE),
                        cycle_length=len(CLASS_NAMES), block_length=images_per_person,
                        num_parallel_calls=AUTOTUNE,
                        deterministic=True)
@@ -190,7 +190,7 @@ def get_test_dataset(data_path, image_size, batch_size, crop_size, cache='', tra
     if len(cache) > 1:
         classes_ds = classes_ds.cache(cache)
     ds = classes_ds.shuffle(len(CLASS_NAMES), reshuffle_each_iteration=True)
-    ds = ds.interleave(lambda x: tf.data.Dataset(x).map(parse_class, num_parallel_calls=AUTOTUNE),
+    ds = ds.interleave(lambda x: tf.data.Dataset.from_tensors(x).map(parse_class, num_parallel_calls=AUTOTUNE),
                        cycle_length=len(CLASS_NAMES), block_length=2,
                        num_parallel_calls=AUTOTUNE,
                        deterministic=True)
