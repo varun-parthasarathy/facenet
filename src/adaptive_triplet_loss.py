@@ -2,6 +2,10 @@
 
 import tensorflow as tf
 import numpy as np
+from tensorflow_addons.utils.keras_utils import LossFunctionWrapper
+from typeguard import typechecked
+from typing import Optional, Union, Callable
+from tensorflow_addons.utils.types import FloatTensorLike, TensorLike
 
 
 def _pairwise_distances(embeddings, squared=False):
