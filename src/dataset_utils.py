@@ -124,16 +124,14 @@ def generate_training_dataset(data_path, image_size, batch_size, crop_size, cach
         return img, label
 
     def parse_class(class_path):
-        with tf.compat.v1.Session() as sess:
-            p = class_path.eval(session=sess)
-            p = p[0]
-        p = pathlib.Path(p)
+        class_path = pathlib.Path(class_path.numpy()[0])
         return tf.data.Dataset.list_files(str(p/'*.jpg'), shuffle=True)
 
     if len(cache) > 1:
         classes_ds = classes_ds.cache(cache)
     ds = classes_ds.shuffle(len(CLASS_NAMES), reshuffle_each_iteration=True)
-    ds = ds.interleave(lambda x: tf.data.Dataset.from_tensors(x).map(parse_class, num_parallel_calls=AUTOTUNE),
+    ds = ds.interleave(lambda x: tf.data.Dataset.from_tensors(x).map(lambda y: tf.py_function(func=parse_class,
+                       inp=[y], Tout=tf.data.Dataset), num_parallel_calls=AUTOTUNE),
                        cycle_length=len(CLASS_NAMES), block_length=images_per_person,
                        num_parallel_calls=AUTOTUNE,
                        deterministic=True)
@@ -187,16 +185,14 @@ def get_test_dataset(data_path, image_size, batch_size, crop_size, cache='', tra
         return img, label
 
     def parse_class(class_path):
-        with tf.compat.v1.Session() as sess:
-            p = class_path.eval(session=sess)
-            p = p[0]
-        p = pathlib.Path(p)
+        class_path = pathlib.Path(class_path.numpy()[0])
         return tf.data.Dataset.list_files(str(p/'*.jpg'), shuffle=True).take(3)
 
     if len(cache) > 1:
         classes_ds = classes_ds.cache(cache)
     ds = classes_ds.shuffle(len(CLASS_NAMES), reshuffle_each_iteration=True)
-    ds = ds.interleave(lambda x: tf.data.Dataset.from_tensors(x).map(parse_class, num_parallel_calls=AUTOTUNE),
+    ds = ds.interleave(lambda x: tf.data.Dataset.from_tensors(x).map(lambda y: tf.py_function(func=parse_class,
+                       inp=[y], Tout=tf.data.Dataset), num_parallel_calls=AUTOTUNE),
                        cycle_length=len(CLASS_NAMES), block_length=2,
                        num_parallel_calls=AUTOTUNE,
                        deterministic=True)
