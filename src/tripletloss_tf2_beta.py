@@ -364,11 +364,11 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-d', '--data_path', required=True,
                         help='Path to training dataset. It should be a folder of folders')
-    parser.add_argument('-b', '--batch_size', required=False, default=128,
+    parser.add_argument('-b', '--batch_size', required=False, type=int, default=128,
                         help='Batch size to use for training')
-    parser.add_argument('-s', '--image_size', required=False, default=246,
+    parser.add_argument('-s', '--image_size', required=False, type=int, default=246,
                         help='Image size (before random crop and preprocessing)')
-    parser.add_argument('-c', '--crop_size', required=False, default=224,
+    parser.add_argument('-c', '--crop_size', required=False, type=int, default=224,
                         help='Image size after random crop is applied')
     parser.add_argument('--lr_schedule', required=False, type=str, default='triangular2',
                         choices=['triangular2', 'triangular', 'staircase', 'exponential_decay'],
