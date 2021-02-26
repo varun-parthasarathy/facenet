@@ -68,3 +68,10 @@ class SAMOptimizer(tf.keras.optimizers.Optimizer):
     @tf.function
     def _grad_norm(self, grads):
         return tf.linalg.global_norm(grads)
+
+    def get_config(self):
+        return {'base_optimizer': self.base_optimizer, 'rho': self._rho}
+
+    def from_config(self, config, custom_objects=None):
+        self.base_optimizer = config['base_optimizer']
+        self._rho = config['rho']
