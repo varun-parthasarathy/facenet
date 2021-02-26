@@ -23,7 +23,7 @@ from tensorflow.keras.applications.inception_resnet_v2 import InceptionResNetV2
 from tensorflow.keras.mixed_precision import experimental as mixed_precision
 from custom_triplet_loss import TripletBatchHardLoss, TripletFocalLoss, TripletBatchHardV2Loss
 from dataset_utils import generate_training_dataset, get_test_dataset, get_LFW_dataset
-from triplet_callbacks_and_metrics import TripletLossMetrics
+from triplet_callbacks_and_metrics import TripletLossMetrics, RangeTestCallback
 
 
 def create_neural_network(model_type='resnet50', embedding_size=512, input_shape=None, weights_path=''):
