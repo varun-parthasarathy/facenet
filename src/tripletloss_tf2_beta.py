@@ -63,7 +63,7 @@ def create_neural_network(model_type='resnet50', embedding_size=512, input_shape
 
     assert base_model is not None, '[ERROR] The model name was not correctly specified'
 
-    logits = base_model.outputs
+    logits = base_model.output # NOT outputs!
     embeddings = tf.keras.layers.Lambda(lambda x: tf.math.l2_normalize(x, axis=1), dtype='float32',
                                         name='embeddings')(logits)
     # embeddings = tf.keras.layers.Activation('linear', dtype='float32')(embeddings)

@@ -65,7 +65,7 @@ def create_neural_network(model_type='resnet50', embedding_size=512, input_shape
 
     assert base_model is not None, '[ERROR] The model name was not correctly specified'
 
-    logits = base_model.outputs
+    logits = base_model.output # NOT outputs!
     embeddings = tf.keras.layers.Lambda(lambda x: tf.math.l2_normalize(x, axis=1), dtype='float32',
                                         name='embeddings')(logits)
     # embeddings = tf.keras.layers.Activation('linear', dtype='float32')(embeddings)
@@ -261,15 +261,11 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
             for step, (x_batch_train, y_batch_train) in enumerate(train_dataset):
                 with tf.GradientTape() as tape:
                     logits = model(x_batch_train, training=True)
-                    if len(logits.shape.numpy()) == 3:
-                        logits = tf.reshape(logits, [logits.shape.numpy()[1], logits.shape.numpy()[2]])
                     loss_value = loss_fn(y_batch_train, logits)
                 grads = tape.gradient(loss_value, model.trainable_weights)
                 perturbations = opt.first_step(grads, model)
                 with tf.GradientTape() as tape:
                     logits = model(x_batch_train, training=True)
-                    if len(logits.shape.numpy()) == 3:
-                        logits = tf.reshape(logits, [logits.shape.numpy()[1], logits.shape.numpy()[2]])
                     loss_value = loss_fn(y_batch_train, logits)
                 grads = tape.gradient(loss_value, model.trainable_weights)
                 opt.second_step(grads, model, perturbations)
@@ -279,8 +275,6 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                     print("Step : %d :: Current loss : %f" % (step, float(loss_value.numpy())))
             for x_batch_test, y_batch_test in test_dataset:
                 val_logits = model(x_batch_test, training=False)
-                if len(val_logits.shape.numpy()) == 3:
-                    val_logits = tf.reshape(val_logits, [val_logits.shape.numpy()[1], val_logits.shape.numpy()[2]])
                 triplet_loss_metrics.update_state(y_batch_test, val_logits)
             result = triplet_loss_metrics.result()
             print(str(result.numpy()))
@@ -326,15 +320,11 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
             for step, (x_batch_train, y_batch_train) in enumerate(train_dataset):
                 with tf.GradientTape() as tape:
                     logits = model(x_batch_train, training=True)
-                    if len(logits.shape.numpy()) == 3:
-                        logits = tf.reshape(logits, [logits.shape.numpy()[1], logits.shape.numpy()[2]])
                     loss_value = loss_fn(y_batch_train, logits)
                 grads = tape.gradient(loss_value, model.trainable_weights)
                 perturbations = opt.first_step(grads, model)
                 with tf.GradientTape() as tape:
                     logits = model(x_batch_train, training=True)
-                    if len(logits.shape.numpy()) == 3:
-                        logits = tf.reshape(logits, [logits.shape.numpy()[1], logits.shape.numpy()[2]])
                     loss_value = loss_fn(y_batch_train, logits)
                 grads = tape.gradient(loss_value, model.trainable_weights)
                 opt.second_step(grads, model, perturbations)
@@ -342,8 +332,6 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                     print("Step : %d :: Current loss : %f" % (step, float(loss_value)))
             for x_batch_test, y_batch_test in test_dataset:
                 val_logits = model(x_batch_test, training=False)
-                if len(val_logits.shape.numpy()) == 3:
-                    val_logits = tf.reshape(val_logits, [val_logits.shape.numpy()[1], val_logits.shape.numpy()[2]])
                 triplet_loss_metrics.update_state(y_batch_test, val_logits)
             result = triplet_loss_metrics.result()
             print(str(result))
