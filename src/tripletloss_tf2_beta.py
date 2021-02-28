@@ -89,6 +89,8 @@ def create_neural_network(model_type='resnet50', embedding_size=512, input_shape
     else:
         print('[WARNING] Could not load weights. Using random initialization instead')
 
+    model.summary()
+    
     return model
 
 def get_learning_rate_schedule(schedule_name, image_count, batch_size, learning_rate=1e-3, max_lr=0.5):
@@ -152,7 +154,8 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                 range_test=False, use_tpu=False, tpu_name=None, test_path='',
                 use_mixed_precision=False, triplet_strategy='', images_per_person=35, 
                 people_per_sample=12, pretrained_model='', distance_metric="L2", soft=True, 
-                sigma=0.3, decay_margin_rate=0.0, use_lfw=True, target_margin=0.2, distributed=False):
+                sigma=0.3, decay_margin_rate=0.0, use_lfw=True, target_margin=0.2, distributed=False,
+                eager_execution=False):
 
     if use_tpu is True:
         assert tpu_name is not None, '[ERROR] TPU name must be specified'
@@ -209,6 +212,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
     else:
         test_dataset = None
 
+    run_eagerly = eager_execution
     if triplet_strategy == 'VANILLA':
         loss_fn = tfa.losses.TripletSemiHardLoss(margin=margin)
         print('[INFO] Using vanilla triplet loss')
@@ -227,6 +231,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
         loss_fn = AdaptiveTripletLoss(margin=margin,
                                       soft=soft,
                                       lambda_=sigma)
+        run_eagerly = True
         print('[INFO] Using Adaptive Triplet Loss')
     else:
         loss_fn = TripletFocalLoss(margin=margin,
@@ -257,7 +262,8 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                 assert model is not None, '[ERROR] There was a problem while loading the pre-trained weights'
                 model.compile(optimizer=opt,
                               loss=loss_fn,
-                              metrics=[triplet_loss_metrics])
+                              metrics=[triplet_loss_metrics],
+                              run_eagerly=run_eagerly)
         elif distributed is True and use_tpu is False:
             with mirrored_strategy.scope():
                 model = create_neural_network(model_type=model_type,
@@ -268,14 +274,16 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                 assert model is not None, '[ERROR] There was a problem while loading the pre-trained weights'
                 model.compile(optimizer=opt,
                               loss=loss_fn,
-                              metrics=[triplet_loss_metrics])
+                              metrics=[triplet_loss_metrics],
+                              run_eagerly=run_eagerly)
         else:
             model = create_neural_network(model_type=model_type,
                                               embedding_size=embedding_size)
             assert model is not None, '[ERROR] There was a problem while loading the pre-trained weights'
             model.compile(optimizer=opt,
                           loss=loss_fn,
-                          metrics=[triplet_loss_metrics])
+                          metrics=[triplet_loss_metrics],
+                          run_eagerly=run_eagerly)
 
         callback_list = [range_finder]
         if decay_margin_callback is not None:
@@ -322,7 +330,8 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                 assert model is not None, '[ERROR] There was a problem in loading the pre-trained weights'
                 model.compile(optimizer=opt,
                               loss=loss_fn,
-                              metrics=[triplet_loss_metrics])
+                              metrics=[triplet_loss_metrics],
+                              run_eagerly=run_eagerly)
         elif distributed is True and use_tpu is False:
             with mirrored_strategy.scope():
                 model = create_neural_network(model_type=model_type,
@@ -333,14 +342,16 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                 assert model is not None, '[ERROR] There was a problem in loading the pre-trained weights'
                 model.compile(optimizer=opt,
                               loss=loss_fn,
-                              metrics=[triplet_loss_metrics])
+                              metrics=[triplet_loss_metrics],
+                              run_eagerly=run_eagerly)
         else:
             model = create_neural_network(model_type=model_type,
                                               embedding_size=embedding_size)
             assert model is not None, '[ERROR] There was a problem in loading the pre-trained weights'
             model.compile(optimizer=opt,
                           loss=loss_fn,
-                          metrics=[triplet_loss_metrics])
+                          metrics=[triplet_loss_metrics],
+                          run_eagerly=run_eagerly)
 
         callback_list = [checkpoint_saver]
         if decay_margin_callback is not None:
@@ -432,6 +443,8 @@ if __name__ == '__main__':
                         help='Minimum margin when using decayed margin')
     parser.add_argument('--distributed', action='store_true',
                         help='Use distributed training strategy for multiple GPUs. Does not work with TPU')
+    parser.add_argument('--eager_execution', action='store_true',
+                        help='Enable eager execution explicitly. May be needed for validation datasets')
 
     args = vars(parser.parse_args())
 
@@ -465,4 +478,5 @@ if __name__ == '__main__':
                 decay_margin_rate=args['decay_margin_rate'],
                 use_lfw=args['use_lfw'],
                 target_margin=args['target_margin'],
-                distributed=args['distributed'])
+                distributed=args['distributed'],
+                eager_execution=args['eager_execution'])

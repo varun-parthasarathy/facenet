@@ -23,7 +23,7 @@ from tensorflow.keras.applications.inception_resnet_v2 import InceptionResNetV2
 from tensorflow.keras.mixed_precision import experimental as mixed_precision
 from custom_triplet_loss import TripletBatchHardLoss, TripletFocalLoss, TripletBatchHardV2Loss
 from dataset_utils import generate_training_dataset, get_test_dataset, get_LFW_dataset
-from triplet_callbacks_and_metrics import TripletLossMetrics, RangeTestCallback
+from triplet_callbacks_and_metrics import TripletLossMetrics
 
 
 def create_neural_network(model_type='resnet50', embedding_size=512, input_shape=None, weights_path=''):
@@ -90,6 +90,8 @@ def create_neural_network(model_type='resnet50', embedding_size=512, input_shape
                 return None
     else:
         print('[WARNING] Could not load weights. Using random initialization instead')
+
+    model.summary()
 
     return model
 
@@ -239,8 +241,6 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
     triplet_loss_metrics = TripletLossMetrics(test_images, embedding_size)
 
     if range_test is True:
-        range_finder = RangeTestCallback(start_lr=1e-5,
-                                         end_lr=10)
         opt = get_optimizer(optimizer_name=optimizer,
                             lr_schedule=1e-5,
                             weight_decay=weight_decay)
@@ -255,31 +255,35 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                           embedding_size=embedding_size)
             assert model is not None, '[ERROR] There was a problem while loading the pre-trained weights'
 
-        callback_list = [range_finder]
-
         lrs = []
         losses = []
         for epoch in range(5):
             for step, (x_batch_train, y_batch_train) in enumerate(train_dataset):
                 with tf.GradientTape() as tape:
                     logits = model(x_batch_train, training=True)
+                    if len(logits.shape.numpy()) == 3:
+                        logits = tf.reshape(logits, [logits.shape.numpy()[1], logits.shape.numpy()[2]])
                     loss_value = loss_fn(y_batch_train, logits)
                 grads = tape.gradient(loss_value, model.trainable_weights)
                 perturbations = opt.first_step(grads, model)
                 with tf.GradientTape() as tape:
                     logits = model(x_batch_train, training=True)
+                    if len(logits.shape.numpy()) == 3:
+                        logits = tf.reshape(logits, [logits.shape.numpy()[1], logits.shape.numpy()[2]])
                     loss_value = loss_fn(y_batch_train, logits)
                 grads = tape.gradient(loss_value, model.trainable_weights)
                 opt.second_step(grads, model, perturbations)
-                losses.append(float(loss_value))
+                losses.append(float(loss_value.numpy()))
                 lrs.append(opt.base_optimizer.lr.numpy())
                 if step % 200 == 0:
-                    print("Step : %d :: Current loss : %f" % (step, float(loss_value)))
+                    print("Step : %d :: Current loss : %f" % (step, float(loss_value.numpy())))
             for x_batch_test, y_batch_test in test_dataset:
                 val_logits = model(x_batch_test, training=False)
+                if len(val_logits.shape.numpy()) == 3:
+                    val_logits = tf.reshape(val_logits, [val_logits.shape.numpy()[1], val_logits.shape.numpy()[2]])
                 triplet_loss_metrics.update_state(y_batch_test, val_logits)
             result = triplet_loss_metrics.result()
-            print(str(result))
+            print(str(result.numpy()))
             triplet_loss_metrics.reset_states()
 
         plt.xscale('log')
@@ -322,11 +326,15 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
             for step, (x_batch_train, y_batch_train) in enumerate(train_dataset):
                 with tf.GradientTape() as tape:
                     logits = model(x_batch_train, training=True)
+                    if len(logits.shape.numpy()) == 3:
+                        logits = tf.reshape(logits, [logits.shape.numpy()[1], logits.shape.numpy()[2]])
                     loss_value = loss_fn(y_batch_train, logits)
                 grads = tape.gradient(loss_value, model.trainable_weights)
                 perturbations = opt.first_step(grads, model)
                 with tf.GradientTape() as tape:
                     logits = model(x_batch_train, training=True)
+                    if len(logits.shape.numpy()) == 3:
+                        logits = tf.reshape(logits, [logits.shape.numpy()[1], logits.shape.numpy()[2]])
                     loss_value = loss_fn(y_batch_train, logits)
                 grads = tape.gradient(loss_value, model.trainable_weights)
                 opt.second_step(grads, model, perturbations)
@@ -334,6 +342,8 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                     print("Step : %d :: Current loss : %f" % (step, float(loss_value)))
             for x_batch_test, y_batch_test in test_dataset:
                 val_logits = model(x_batch_test, training=False)
+                if len(val_logits.shape.numpy()) == 3:
+                    val_logits = tf.reshape(val_logits, [val_logits.shape.numpy()[1], val_logits.shape.numpy()[2]])
                 triplet_loss_metrics.update_state(y_batch_test, val_logits)
             result = triplet_loss_metrics.result()
             print(str(result))

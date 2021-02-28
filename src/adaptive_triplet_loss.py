@@ -117,7 +117,7 @@ def _get_triplet_mask(labels):
 
 
 def adapted_triplet_loss(labels, embeddings, lambda_=2.0, margin=1, soft=False, squared=False):
-    """Build the apdaptive triplet loss over a batch of embeddings.
+    """Build the adaptive triplet loss over a batch of embeddings.
     We generate all the valid triplets and average the loss over the positive ones and add it to the distribution shift.
     Args:
         labels: labels of the batch, of size (batch_size,)
