@@ -273,6 +273,13 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                 lrs.append(opt.base_optimizer.lr.numpy())
                 if step % 200 == 0:
                     print("Step : %d :: Current loss : %f" % (step, float(loss_value.numpy())))
+                    plt.xscale('log')
+                    plt.plot(lrs, losses, color='blue')
+                    smooth_losses = savgol_filter(losses, 5)
+                    plt.plot(lrs, smooth_losses, color='red')
+                    plt.xlabel('Log learning rate')
+                    plt.ylabel('Loss')
+                    plt.savefig('./range_test_result.png')
             for x_batch_test, y_batch_test in test_dataset:
                 val_logits = model(x_batch_test, training=False)
                 triplet_loss_metrics.update_state(y_batch_test, val_logits)
@@ -282,7 +289,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
 
         plt.xscale('log')
         plt.plot(lrs, losses, color='blue')
-        smooth_losses = savgol_filter(train_history.losses, 5)
+        smooth_losses = savgol_filter(losses, 5)
         plt.plot(lrs, smooth_losses, color='red')
         plt.xlabel('Log learning rate')
         plt.ylabel('Loss')
