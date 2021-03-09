@@ -294,7 +294,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                   validation_data=test_dataset)
         plt.xscale('log')
         plt.plot(train_history.lrs, train_history.losses, color='blue')
-        smooth_losses = savgol_filter(train_history.losses, 10, 3)
+        smooth_losses = savgol_filter(train_history.losses, 7, 3)
         plt.plot(train_history.lrs, smooth_losses, color='red')
         plt.xlabel('Log learning rate')
         plt.ylabel('Loss')

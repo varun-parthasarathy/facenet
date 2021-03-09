@@ -275,7 +275,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                     print("Step : %d :: Current loss : %f" % (step, float(loss_value.numpy())))
                     plt.xscale('log')
                     plt.plot(lrs, losses, color='blue')
-                    smooth_losses = savgol_filter(losses, 10, 3)
+                    smooth_losses = savgol_filter(losses, 7, 3)
                     plt.plot(lrs, smooth_losses, color='red')
                     plt.xlabel('Log learning rate')
                     plt.ylabel('Loss')
@@ -289,7 +289,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
 
         plt.xscale('log')
         plt.plot(lrs, losses, color='blue')
-        smooth_losses = savgol_filter(losses, 10, 3)
+        smooth_losses = savgol_filter(losses, 7, 3)
         plt.plot(lrs, smooth_losses, color='red')
         plt.xlabel('Log learning rate')
         plt.ylabel('Loss')
