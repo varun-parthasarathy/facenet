@@ -271,7 +271,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                 opt.second_step(grads, model, perturbations)
                 losses.append(float(loss_value.numpy()))
                 lrs.append(opt.base_optimizer.lr.numpy())
-                if step % 200 == 0:
+                if step % 200 == 0 and step > 0:
                     print("Step : %d :: Current loss : %f" % (step, float(loss_value.numpy())))
                     plt.xscale('log')
                     plt.plot(lrs, losses, color='blue')
