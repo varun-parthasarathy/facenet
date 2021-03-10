@@ -1,3 +1,4 @@
+import sys
 import math
 import random
 import numpy as np
@@ -114,27 +115,25 @@ def _calculate_val_far(threshold, dist, actual_issame):
 class TripletLossMetrics(tf.keras.metrics.Metric):
     def __init__(self, nrof_images, embedding_size, name='TripletLossMetrics', **kwargs):
         super(TripletLossMetrics, self).__init__(name=name, **kwargs)
-        self.labels = self.add_weight(name='labels', initializer='zeros', shape=(nrof_images), dtype=tf.int64)
-        self.embeddings = self.add_weight(name='embeddings', initializer='zeros',
-                                          shape=(nrof_images, embedding_size),
-                                          dtype=tf.float32)
+        self.labels = np.zeros((nrof_images,))
+        self.embeddings = np.zeros((nrof_images, embedding_size))
         self.nrof_batches = self.add_weight(name='batches', initializer='zeros', dtype=tf.int64)
         self.start_idx = self.add_weight(name='start_idx', initializer='zeros', dtype=tf.int64)
 
     def update_state(self, y_true, y_pred, sample_weight=None):
         end_idx = self.start_idx + tf.shape(y_pred).numpy()[0]
-        self.labels[self.start_idx:end_idx] = y_true
-        self.embeddings[self.start_idx:end_idx] = y_pred
+        self.labels[self.start_idx:end_idx] = y_true.numpy()
+        self.embeddings[self.start_idx:end_idx] = y_pred.numpy()
         self.start_idx.assign(end_idx)
         self.nrof_batches.assign_add(1)
 
     def result(self):
         result_string = 'Accuracy : {}%+-{}% :: Validation rate : {}%+-{}% @FAR : {} :: AUC : {} :: EER : {}'
         thresholds = np.arange(0, 2, 0.01)
-        y_pred = tf.make_ndarray(tf.make_tensor_proto(self.embeddings)) # Try using tensor.numpy() instead
+        y_pred = self.embeddings
         embeddings1 = y_pred[0::2]
         embeddings2 = y_pred[1::2]
-        y_true = tf.make_ndarray(tf.make_tensor_proto(self.labels))
+        y_true = self.labels
         actual_issame = np.equal(y_true[0::2], y_true[1::2])
         tpr, fpr, accuracy, acc_std = _calculate_roc(thresholds, embeddings1, embeddings2,
                                                      actual_issame, nrof_folds=10, distance_metric=0)
@@ -144,12 +143,14 @@ class TripletLossMetrics(tf.keras.metrics.Metric):
         auc = metrics.auc(fpr, tpr)
         eer = brentq(lambda x: 1. - x - interpolate.interp1d(fpr, tpr)(x), 0., 1.)
         result_string.format(acc, acc_std, val, val_std, far, auc, eer)
-
+        #DEBUG
+        print(result_string, flush=True)
+        #DEBUG ENDS
         return tf.convert_to_tensor(result_string, dtype=str)
 
     def reset_states(self):
-        self.labels.assign(np.zeros(tf.shape(self.labels).numpy()))
-        self.embeddings.assign(np.zeros(tf.shape(self.embeddings).numpy()))
+        self.labels = np.zeros((nrof_images,))
+        self.embeddings = np.zeros((nrof_images, embedding_size))
         self.nrof_batches.assign(0)
         self.start_idx.assign(0)
 
