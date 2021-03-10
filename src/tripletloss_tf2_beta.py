@@ -188,7 +188,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                                                  use_tpu=use_tpu,
                                                                  model_type=model_type)
 
-    if test_path is  not None and len(test_path) > 1:
+    if test_path is not None and len(test_path) > 1:
         if use_lfw is True:
             test_dataset, test_images, _ = get_LFW_dataset(data_path=test_path, 
                                                            image_size=image_size, 
@@ -251,7 +251,9 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
 
     if range_test is True:
         range_finder = RangeTestCallback(start_lr=1e-5,
-                                         end_lr=10)
+                                         end_lr=10,
+                                         n_imgs=n_imgs,
+                                         batch_size=batch_size)
         opt = get_optimizer(optimizer_name=optimizer,
                             lr_schedule=1e-5,
                             weight_decay=weight_decay)

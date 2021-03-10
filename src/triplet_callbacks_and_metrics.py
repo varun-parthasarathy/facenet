@@ -155,16 +155,18 @@ class TripletLossMetrics(tf.keras.metrics.Metric):
 
 
 class RangeTestCallback(tf.keras.callbacks.Callback):
-    def __init__(self, start_lr, end_lr):
+    def __init__(self, start_lr, end_lr, n_imgs, batch_size):
         super().__init__()
         self.start_lr = start_lr
         self.end_lr = end_lr
+        self.n_imgs = n_imgs
+        self.batch_size = batch_size
 
     def on_train_begin(self, logs={}):
         self.lrs = []
         self.losses = []
         tf.keras.backend.set_value(self.model.optimizer.lr, self.start_lr)
-        n_steps = self.params['steps'] if self.params['steps'] is not None else round(self.params['samples'] / self.params['batch_size'])
+        n_steps = self.params['steps'] if self.params['steps'] is not None else round(self.n_imgs / self.batch_size)
         n_steps *= self.params['epochs']
         self.by = (self.end_lr - self.start_lr) / n_steps
 
