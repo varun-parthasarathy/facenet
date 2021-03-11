@@ -117,15 +117,15 @@ class TripletLossMetrics(tf.keras.metrics.Metric):
         super(TripletLossMetrics, self).__init__(name=name, **kwargs)
         self.labels = np.zeros((nrof_images,))
         self.embeddings = np.zeros((nrof_images, embedding_size))
-        self.nrof_batches = self.add_weight(name='batches', initializer='zeros', dtype=tf.int64)
-        self.start_idx = self.add_weight(name='start_idx', initializer='zeros', dtype=tf.int64)
+        self.nrof_batches = 0
+        self.start_idx = 0
 
     def update_state(self, y_true, y_pred, sample_weight=None):
         end_idx = self.start_idx + tf.shape(y_pred).numpy()[0]
         self.labels[self.start_idx:end_idx] = y_true.numpy()
         self.embeddings[self.start_idx:end_idx] = y_pred.numpy()
-        self.start_idx.assign(end_idx)
-        self.nrof_batches.assign_add(1)
+        self.start_idx = end_idx
+        self.nrof_batches += 1
 
     def result(self):
         result_string = 'Accuracy : {}%+-{}% :: Validation rate : {}%+-{}% @FAR : {} :: AUC : {} :: EER : {}'
@@ -151,8 +151,8 @@ class TripletLossMetrics(tf.keras.metrics.Metric):
     def reset_states(self):
         self.labels = np.zeros((nrof_images,))
         self.embeddings = np.zeros((nrof_images, embedding_size))
-        self.nrof_batches.assign(0)
-        self.start_idx.assign(0)
+        self.nrof_batches = 0
+        self.start_idx = 0
 
 
 class RangeTestCallback(tf.keras.callbacks.Callback):
