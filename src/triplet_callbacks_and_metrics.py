@@ -53,7 +53,6 @@ def _calculate_roc(thresholds, embeddings1, embeddings2, actual_issame, nrof_fol
           
         tpr = np.mean(tprs, 0)
         fpr = np.mean(fprs, 0)
-        accuracy = np.mean(accuracy)
 
     return tpr, fpr, accuracy, np.std(accuracy)
 
@@ -142,6 +141,7 @@ class TripletLossMetrics(tf.keras.metrics.Metric):
                                            actual_issame, 1e-3, nrof_folds=10, distance_metric=0)
         auc = metrics.auc(fpr, tpr)
         eer = brentq(lambda x: 1. - x - interpolate.interp1d(fpr, tpr)(x), 0., 1.)
+        acc = np.mean(accuracy)
         result_string.format(acc, acc_std, val, val_std, far, auc, eer)
         #DEBUG
         print(result_string, flush=True)
