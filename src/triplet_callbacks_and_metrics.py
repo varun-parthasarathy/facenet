@@ -122,8 +122,8 @@ class TripletLossMetrics(tf.keras.metrics.Metric):
 
     def update_state(self, y_true, y_pred, sample_weight=None):
         end_idx = self.start_idx + tf.shape(y_pred).numpy()[0]
-        self.labels[self.start_idx:end_idx] = y_true.numpy()
-        self.embeddings[self.start_idx:end_idx] = y_pred.numpy()
+        self.labels[self.start_idx:end_idx] = np.squeeze(y_true.numpy())
+        self.embeddings[self.start_idx:end_idx] = np.squeeze(y_pred.numpy())
         self.start_idx = end_idx
         self.nrof_batches += 1
 
