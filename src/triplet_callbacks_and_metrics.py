@@ -118,41 +118,63 @@ class TripletLossMetrics(tf.keras.metrics.Metric):
         self.embeddings = np.zeros((nrof_images, embedding_size))
         self.nrof_batches = 0
         self.start_idx = 0
+        self.isTesting = False
 
     def update_state(self, y_true, y_pred, sample_weight=None):
-        end_idx = self.start_idx + tf.shape(y_pred).numpy()[0]
-        self.labels[self.start_idx:end_idx] = np.squeeze(y_true.numpy())
-        self.embeddings[self.start_idx:end_idx] = np.squeeze(y_pred.numpy())
-        self.start_idx = end_idx
-        self.nrof_batches += 1
+        if self.isTesting is True:
+            end_idx = self.start_idx + tf.shape(y_pred).numpy()[0]
+            self.labels[self.start_idx:end_idx] = np.squeeze(y_true.numpy())
+            self.embeddings[self.start_idx:end_idx] = np.squeeze(y_pred.numpy())
+            self.start_idx = end_idx
+            self.nrof_batches += 1
 
     def result(self):
-        result_string = 'Accuracy : {}%+-{}% :: Validation rate : {}%+-{}% @FAR : {} :: AUC : {} :: EER : {}'
-        thresholds = np.arange(0, 2, 0.01)
-        y_pred = self.embeddings
-        embeddings1 = y_pred[0::2]
-        embeddings2 = y_pred[1::2]
-        y_true = self.labels
-        actual_issame = np.equal(y_true[0::2], y_true[1::2])
-        tpr, fpr, accuracy, acc_std = _calculate_roc(thresholds, embeddings1, embeddings2,
-                                                     actual_issame, nrof_folds=10, distance_metric=0)
-        thresholds = np.arange(0, 2, 0.001)
-        val, val_std, far = _calculate_val(thresholds, embeddings1, embeddings2,
-                                           actual_issame, 1e-3, nrof_folds=10, distance_metric=0)
-        auc = metrics.auc(fpr, tpr)
-        eer = brentq(lambda x: 1. - x - interpolate.interp1d(fpr, tpr)(x), 0., 1.)
-        acc = np.mean(accuracy)
-        result_string.format(acc, acc_std, val, val_std, far, auc, eer)
-        #DEBUG
-        print(result_string, flush=True)
-        #DEBUG ENDS
-        return tf.convert_to_tensor(result_string, dtype=str)
+        if self.isTesting is True:
+            result_string = 'Accuracy : {}%+-{}% :: Validation rate : {}%+-{}% @FAR : {} :: AUC : {} :: EER : {}'
+            thresholds = np.arange(0, 2, 0.01)
+            y_pred = self.embeddings
+            embeddings1 = y_pred[0::2]
+            embeddings2 = y_pred[1::2]
+            y_true = self.labels
+            actual_issame = np.equal(y_true[0::2], y_true[1::2])
+            tpr, fpr, accuracy, acc_std = _calculate_roc(thresholds, embeddings1, embeddings2,
+                                                         actual_issame, nrof_folds=10, distance_metric=0)
+            thresholds = np.arange(0, 2, 0.001)
+            val, val_std, far = _calculate_val(thresholds, embeddings1, embeddings2,
+                                               actual_issame, 1e-3, nrof_folds=10, distance_metric=0)
+            auc = metrics.auc(fpr, tpr)
+            eer = brentq(lambda x: 1. - x - interpolate.interp1d(fpr, tpr)(x), 0., 1.)
+            acc = np.mean(accuracy)
+            result_string.format(acc, acc_std, val, val_std, far, auc, eer)
+            #DEBUG
+            print(result_string, flush=True)
+            #DEBUG ENDS
+            return tf.convert_to_tensor(result_string, dtype=str)
+        else:
+            return 0
 
     def reset_states(self):
         self.labels = np.zeros((nrof_images,))
         self.embeddings = np.zeros((nrof_images, embedding_size))
         self.nrof_batches = 0
         self.start_idx = 0
+
+
+class ToggleMetricEval(tf.keras.callbacks.Callback):
+    def __init__(self):
+        super().__init__()
+
+    def on_test_begin(self, logs):
+        for metric in self.model.metrics:
+            if 'TripletLossMetrics' in metric.name:
+                metric.isTesting = True
+                break
+
+    def on_test_end(self, logs):
+        for metric in self.model.metrics:
+            if 'TripletLossMetrics' in metric.name:
+                metric.isTesting = False
+                break
 
 
 class RangeTestCallback(tf.keras.callbacks.Callback):

@@ -21,7 +21,7 @@ from tensorflow.keras.applications.inception_resnet_v2 import InceptionResNetV2
 from tensorflow.keras.mixed_precision import experimental as mixed_precision
 from custom_triplet_loss import TripletBatchHardLoss, TripletFocalLoss, TripletBatchHardV2Loss
 from dataset_utils import generate_training_dataset, get_test_dataset, get_LFW_dataset
-from triplet_callbacks_and_metrics import RangeTestCallback, DecayMarginCallback, TripletLossMetrics
+from triplet_callbacks_and_metrics import RangeTestCallback, DecayMarginCallback, TripletLossMetrics, ToggleMetricEval
 
 
 def create_neural_network(model_type='resnet50', embedding_size=512, input_shape=None, weights_path=''):
@@ -212,7 +212,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
     else:
         test_dataset = None
 
-    run_eagerly = eager_execution
+    run_eagerly = eager_execution if eager_execution is not None else False
     if triplet_strategy == 'VANILLA':
         loss_fn = tfa.losses.TripletSemiHardLoss(margin=margin)
         print('[INFO] Using vanilla triplet loss')
@@ -248,6 +248,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
         decay_margin_callback = None
 
     triplet_loss_metrics = TripletLossMetrics(test_images, embedding_size)
+    toggle_metrics = ToggleMetricEval()
 
     if range_test is True:
         range_finder = RangeTestCallback(start_lr=1e-5,
@@ -280,14 +281,14 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                               run_eagerly=run_eagerly)
         else:
             model = create_neural_network(model_type=model_type,
-                                              embedding_size=embedding_size)
+                                          embedding_size=embedding_size)
             assert model is not None, '[ERROR] There was a problem while loading the pre-trained weights'
             model.compile(optimizer=opt,
                           loss=loss_fn,
                           metrics=[triplet_loss_metrics],
                           run_eagerly=run_eagerly)
 
-        callback_list = [range_finder]
+        callback_list = [range_finder, toggle_metrics]
         if decay_margin_callback is not None:
             callback_list.append(decay_margin_callback)
 
@@ -355,7 +356,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                           metrics=[triplet_loss_metrics],
                           run_eagerly=run_eagerly)
 
-        callback_list = [checkpoint_saver]
+        callback_list = [checkpoint_saver, toggle_metrics]
         if decay_margin_callback is not None:
             callback_list.append(decay_margin_callback)
 
