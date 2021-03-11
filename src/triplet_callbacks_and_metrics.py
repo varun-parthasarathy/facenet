@@ -5,7 +5,9 @@ import numpy as np
 import tensorflow as tf
 from sklearn import metrics
 from scipy import interpolate
+import matplotlib.pyplot as plt
 from scipy.optimize import brentq
+from scipy.signal import savgol_filter
 from sklearn.model_selection import KFold
 
 
@@ -184,6 +186,7 @@ class RangeTestCallback(tf.keras.callbacks.Callback):
         self.end_lr = end_lr
         self.n_imgs = n_imgs
         self.batch_size = batch_size
+        self.batches_so_far = 0
 
     def on_train_begin(self, logs={}):
         self.lrs = []
@@ -199,6 +202,16 @@ class RangeTestCallback(tf.keras.callbacks.Callback):
         self.losses.append(logs.get('loss'))
         lr += self.by
         tf.keras.backend.set_value(self.model.optimizer.lr, lr)
+        self.batches_so_far += 1
+        if self.batches_so_far % 200 == 0 and self.batches_so_far > 0:
+            plt.xscale('log')
+            plt.plot(self.lrs, self.losses, color='blue')
+            smooth_losses = savgol_filter(self.losses, 7, 3)
+            plt.plot(self.lrs, smooth_losses, color='red')
+            plt.xlabel('Log learning rate')
+            plt.ylabel('Loss')
+            plt.savefig('./range_test_result.png')
+            plt.clf()
 
 
 class DecayMarginCallback(tf.keras.callbacks.Callback):

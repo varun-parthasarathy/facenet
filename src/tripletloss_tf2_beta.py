@@ -318,14 +318,14 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
         if not os.path.exists(checkpoint_path):
             os.mkdir(checkpoint_path)
 
-        checkpoint_name = checkpoint_path + '/' + 'cp-{epoch:03d}.ckpt'
+        #checkpoint_name = checkpoint_path + '/' + 'cp-{epoch:03d}.ckpt'
+        checkpoint_name = checkpoint_path + '/' + 'cp-slurm.ckpt'
         checkpoint_saver = tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_name,
                                                               save_weights_only=True,
                                                               monitor='val_loss',
                                                               mode='min',
                                                               save_best_only=False,
-                                                              #save_freq='epoch')
-                                                              period=5) # WARNING - Deprecated argument!
+                                                              save_freq=5000)
         if use_tpu is True:
             with strategy.scope():
                 model = create_neural_network(model_type=model_type,
