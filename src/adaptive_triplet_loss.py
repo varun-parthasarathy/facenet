@@ -131,6 +131,8 @@ def adapted_triplet_loss(labels, embeddings, lambda_=2.0, margin=1, soft=False, 
     """
     
     # Get the pairwise distance matrix
+    labels = tf.squeeze(labels)
+    embeddings = tf.squeeze(embeddings)
     pairwise_dist = _pairwise_distances(embeddings, squared=squared)
 
     # For each anchor, get the hardest positive
