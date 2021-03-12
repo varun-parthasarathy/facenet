@@ -68,6 +68,7 @@ def create_neural_network(model_type='resnet50', embedding_size=512, input_shape
                                         name='embeddings')(logits)
     # embeddings = tf.keras.layers.Activation('linear', dtype='float32')(embeddings)
     model = Model(inputs=base_model.input, outputs=embeddings)
+    compiled = False
 
     if input_shape is not None:
         in_shape = np.array(model.input.shape)
@@ -77,12 +78,14 @@ def create_neural_network(model_type='resnet50', embedding_size=512, input_shape
     if len(weights_path) > 1 and os.path.exists(weights_path):
         print('[INFO] Attempting to load weights from most recently saved checkpoint')
         try:
-            latest = tf.train.latest_checkpoint(weights_path)
-            model.load_weights(latest)
+            model = tf.keras.models.load_model(weights_path)
+            compiled = True
+            print('[INFO] Loading model from SavedModel format')
         except:
             try:
-                model = tf.keras.models.load_model(weights_path)
-                print('[INFO] Loading model from SavedModel format')
+                latest = tf.train.latest_checkpoint(weights_path)
+                model.load_weights(latest)
+                print('[WARNING] Loading model weights from ckpt format. Model state is not preserved')
             except:
                 print('[ERROR] Weights did not match the model architecture specified, or path was incorrect')
                 return None
@@ -91,7 +94,7 @@ def create_neural_network(model_type='resnet50', embedding_size=512, input_shape
 
     model.summary()
     
-    return model
+    return model, compiled
 
 def get_learning_rate_schedule(schedule_name, image_count, batch_size, learning_rate=1e-3, max_lr=0.5):
     lr = None
@@ -260,33 +263,36 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                             weight_decay=weight_decay)
         if use_tpu is True:
             with strategy.scope():
-                model = create_neural_network(model_type=model_type,
-                                              embedding_size=embedding_size)
+                model, compiled = create_neural_network(model_type=model_type,
+                                                        embedding_size=embedding_size)
                 assert model is not None, '[ERROR] There was a problem while loading the pre-trained weights'
-                model.compile(optimizer=opt,
-                              loss=loss_fn,
-                              metrics=[triplet_loss_metrics],
-                              run_eagerly=run_eagerly)
+                if compiled is False:
+                    model.compile(optimizer=opt,
+                                  loss=loss_fn,
+                                  metrics=[triplet_loss_metrics],
+                                  run_eagerly=run_eagerly)
         elif distributed is True and use_tpu is False:
             with mirrored_strategy.scope():
-                model = create_neural_network(model_type=model_type,
-                                              embedding_size=embedding_size)
+                model, compiled = create_neural_network(model_type=model_type,
+                                                        embedding_size=embedding_size)
                 opt = get_optimizer(optimizer_name=optimizer,
                                     lr_schedule=1e-5,
                                     weight_decay=weight_decay) # Optimizer must be created within scope!
                 assert model is not None, '[ERROR] There was a problem while loading the pre-trained weights'
+                if compiled is False:
+                    model.compile(optimizer=opt,
+                                  loss=loss_fn,
+                                  metrics=[triplet_loss_metrics],
+                                  run_eagerly=run_eagerly)
+        else:
+            model, compiled = create_neural_network(model_type=model_type,
+                                                    embedding_size=embedding_size)
+            assert model is not None, '[ERROR] There was a problem while loading the pre-trained weights'
+            if compiled is False:
                 model.compile(optimizer=opt,
                               loss=loss_fn,
                               metrics=[triplet_loss_metrics],
                               run_eagerly=run_eagerly)
-        else:
-            model = create_neural_network(model_type=model_type,
-                                          embedding_size=embedding_size)
-            assert model is not None, '[ERROR] There was a problem while loading the pre-trained weights'
-            model.compile(optimizer=opt,
-                          loss=loss_fn,
-                          metrics=[triplet_loss_metrics],
-                          run_eagerly=run_eagerly)
 
         callback_list = [range_finder, toggle_metrics]
         if decay_margin_callback is not None:
@@ -319,42 +325,44 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
             os.mkdir(checkpoint_path)
 
         #checkpoint_name = checkpoint_path + '/' + 'cp-{epoch:03d}.ckpt'
-        checkpoint_name = checkpoint_path + '/' + 'cp-slurm.ckpt'
-        checkpoint_saver = tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_name,
-                                                              save_weights_only=True,
+        checkpoint_saver = tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_path,
+                                                              save_weights_only=False,
                                                               monitor='val_loss',
                                                               mode='min',
                                                               save_best_only=False,
                                                               save_freq=5000)
         if use_tpu is True:
             with strategy.scope():
-                model = create_neural_network(model_type=model_type,
-                                              embedding_size=embedding_size)
+                model, compiled = create_neural_network(model_type=model_type,
+                                                        embedding_size=embedding_size)
                 assert model is not None, '[ERROR] There was a problem in loading the pre-trained weights'
-                model.compile(optimizer=opt,
-                              loss=loss_fn,
-                              metrics=[triplet_loss_metrics],
-                              run_eagerly=run_eagerly)
+                if compiled is False:
+                    model.compile(optimizer=opt,
+                                  loss=loss_fn,
+                                  metrics=[triplet_loss_metrics],
+                                  run_eagerly=run_eagerly)
         elif distributed is True and use_tpu is False:
             with mirrored_strategy.scope():
-                model = create_neural_network(model_type=model_type,
-                                              embedding_size=embedding_size)
+                model, compiled = create_neural_network(model_type=model_type,
+                                                        embedding_size=embedding_size)
                 opt = get_optimizer(optimizer_name=optimizer,
                                     lr_schedule=lr_schedule,
                                     weight_decay=weight_decay) # Optimizer must be created within scope!
                 assert model is not None, '[ERROR] There was a problem in loading the pre-trained weights'
+                if compiled is False:
+                    model.compile(optimizer=opt,
+                                  loss=loss_fn,
+                                  metrics=[triplet_loss_metrics],
+                                  run_eagerly=run_eagerly)
+        else:
+            model, compiled = create_neural_network(model_type=model_type,
+                                                    embedding_size=embedding_size)
+            assert model is not None, '[ERROR] There was a problem in loading the pre-trained weights'
+            if compiled is False:
                 model.compile(optimizer=opt,
                               loss=loss_fn,
                               metrics=[triplet_loss_metrics],
                               run_eagerly=run_eagerly)
-        else:
-            model = create_neural_network(model_type=model_type,
-                                              embedding_size=embedding_size)
-            assert model is not None, '[ERROR] There was a problem in loading the pre-trained weights'
-            model.compile(optimizer=opt,
-                          loss=loss_fn,
-                          metrics=[triplet_loss_metrics],
-                          run_eagerly=run_eagerly)
 
         callback_list = [checkpoint_saver, toggle_metrics]
         if decay_margin_callback is not None:
