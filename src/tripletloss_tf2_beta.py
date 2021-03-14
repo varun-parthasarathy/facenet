@@ -81,6 +81,7 @@ def create_neural_network(model_type='resnet50', embedding_size=512, input_shape
             model = tf.keras.models.load_model(weights_path)
             compiled = True
             print('[INFO] Loading model from SavedModel format')
+            print('[WARNING] Model is already compiled; ignoring passed optimizer and learning rate parameters')
         except:
             try:
                 latest = tf.train.latest_checkpoint(weights_path)
@@ -88,7 +89,8 @@ def create_neural_network(model_type='resnet50', embedding_size=512, input_shape
                 print('[WARNING] Loading model weights from ckpt format. Model state is not preserved')
             except:
                 print('[ERROR] Weights did not match the model architecture specified, or path was incorrect')
-                return None
+                print('[WARNING] Could not load weights. Using random initialization instead')
+                return model, compiled
     else:
         print('[WARNING] Could not load weights. Using random initialization instead')
 
@@ -158,7 +160,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                 use_mixed_precision=False, triplet_strategy='', images_per_person=35, 
                 people_per_sample=12, pretrained_model='', distance_metric="L2", soft=True, 
                 sigma=0.3, decay_margin_rate=0.0, use_lfw=True, target_margin=0.2, distributed=False,
-                eager_execution=False):
+                eager_execution=False, weights_path=''):
 
     if use_tpu is True:
         assert tpu_name is not None, '[ERROR] TPU name must be specified'
@@ -264,7 +266,8 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
         if use_tpu is True:
             with strategy.scope():
                 model, compiled = create_neural_network(model_type=model_type,
-                                                        embedding_size=embedding_size)
+                                                        embedding_size=embedding_size,
+                                                        weights_path=weights_path)
                 assert model is not None, '[ERROR] There was a problem while loading the pre-trained weights'
                 if compiled is False:
                     model.compile(optimizer=opt,
@@ -274,7 +277,8 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
         elif distributed is True and use_tpu is False:
             with mirrored_strategy.scope():
                 model, compiled = create_neural_network(model_type=model_type,
-                                                        embedding_size=embedding_size)
+                                                        embedding_size=embedding_size,
+                                                        weights_path=weights_path)
                 opt = get_optimizer(optimizer_name=optimizer,
                                     lr_schedule=1e-5,
                                     weight_decay=weight_decay) # Optimizer must be created within scope!
@@ -286,7 +290,8 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                   run_eagerly=run_eagerly)
         else:
             model, compiled = create_neural_network(model_type=model_type,
-                                                    embedding_size=embedding_size)
+                                                    embedding_size=embedding_size,
+                                                    weights_path=weights_path)
             assert model is not None, '[ERROR] There was a problem while loading the pre-trained weights'
             if compiled is False:
                 model.compile(optimizer=opt,
@@ -334,7 +339,8 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
         if use_tpu is True:
             with strategy.scope():
                 model, compiled = create_neural_network(model_type=model_type,
-                                                        embedding_size=embedding_size)
+                                                        embedding_size=embedding_size,
+                                                        weights_path=weights_path)
                 assert model is not None, '[ERROR] There was a problem in loading the pre-trained weights'
                 if compiled is False:
                     model.compile(optimizer=opt,
@@ -344,7 +350,8 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
         elif distributed is True and use_tpu is False:
             with mirrored_strategy.scope():
                 model, compiled = create_neural_network(model_type=model_type,
-                                                        embedding_size=embedding_size)
+                                                        embedding_size=embedding_size,
+                                                        weights_path=weights_path)
                 opt = get_optimizer(optimizer_name=optimizer,
                                     lr_schedule=lr_schedule,
                                     weight_decay=weight_decay) # Optimizer must be created within scope!
@@ -356,7 +363,8 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                   run_eagerly=run_eagerly)
         else:
             model, compiled = create_neural_network(model_type=model_type,
-                                                    embedding_size=embedding_size)
+                                                    embedding_size=embedding_size,
+                                                    weights_path=weights_path)
             assert model is not None, '[ERROR] There was a problem in loading the pre-trained weights'
             if compiled is False:
                 model.compile(optimizer=opt,
@@ -456,6 +464,8 @@ if __name__ == '__main__':
                         help='Use distributed training strategy for multiple GPUs. Does not work with TPU')
     parser.add_argument('--eager_execution', action='store_true',
                         help='Enable eager execution explicitly. May be needed for validation datasets')
+    parser.add_argument('--weights_path', type=str, default='', required=False,
+                        help='Path to saved weights/checkpoints (if using saved weights for further training)')
 
     args = vars(parser.parse_args())
 
@@ -490,4 +500,5 @@ if __name__ == '__main__':
                 use_lfw=args['use_lfw'],
                 target_margin=args['target_margin'],
                 distributed=args['distributed'],
-                eager_execution=args['eager_execution'])
+                eager_execution=args['eager_execution'],
+                weights_path=args['weights_path'])
