@@ -335,7 +335,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                                               monitor='val_loss',
                                                               mode='min',
                                                               save_best_only=False,
-                                                              save_freq=5000)
+                                                              save_freq=4500)
         if use_tpu is True:
             with strategy.scope():
                 model, compiled = create_neural_network(model_type=model_type,
@@ -379,7 +379,8 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
         train_history = model.fit(train_dataset, 
                                   epochs=num_epochs, 
                                   callbacks=callback_list, 
-                                  validation_data=test_dataset)
+                                  validation_data=test_dataset,
+                                  steps_per_epoch=9000)
         
         if not os.path.exists('./results'):
             os.mkdir('./results')
