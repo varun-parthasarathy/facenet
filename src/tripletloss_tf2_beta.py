@@ -158,9 +158,9 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                 optimizer, model_type, embedding_size, num_epochs, checkpoint_path, margin=0.35, cache_path=None,
                 range_test=False, use_tpu=False, tpu_name=None, test_path='',
                 use_mixed_precision=False, triplet_strategy='', images_per_person=35, 
-                people_per_sample=12, pretrained_model='', distance_metric="L2", soft=True, 
+                people_per_sample=12, distance_metric="L2", soft=True, 
                 sigma=0.3, decay_margin_rate=0.0, use_lfw=True, target_margin=0.2, distributed=False,
-                eager_execution=False, weights_path=''):
+                eager_execution=False, weights_path='', checkpoint_interval=5000):
 
     if use_tpu is True:
         assert tpu_name is not None, '[ERROR] TPU name must be specified'
@@ -335,7 +335,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                                               monitor='val_loss',
                                                               mode='min',
                                                               save_best_only=False,
-                                                              save_freq=5000)
+                                                              save_freq=checkpoint_interval)
         if use_tpu is True:
             with strategy.scope():
                 model, compiled = create_neural_network(model_type=model_type,
@@ -445,8 +445,6 @@ if __name__ == '__main__':
                         help='Average number of images per class. Default is 35 (from MS1M cleaned + AsianCeleb)')
     parser.add_argument('--people_per_sample', required=False, type=int, default=50,
                         help='Number of people per sample. Helps fill buffer for shuffling the dataset properly')
-    parser.add_argument('--pretrained_model', required=False, type=str,
-                        help='Path to pretrained model OR folder containing previously trained checkpoints')
     parser.add_argument('--distance_metric', required=False, type=str, default='L2',
                         choices=['L2', 'squared-L2', 'angular'],
                         help='Choice of distance metric. Default is Euclidean distance')
@@ -466,6 +464,8 @@ if __name__ == '__main__':
                         help='Enable eager execution explicitly. May be needed for validation datasets')
     parser.add_argument('--weights_path', type=str, default='', required=False,
                         help='Path to saved weights/checkpoints (if using saved weights for further training)')
+    parser.add_argument('--checkpoint_interval', type=int, default=5000, required=False,
+                        help='Frequency of model checkpointing. Default is every 5000 steps')
 
     args = vars(parser.parse_args())
 
@@ -492,7 +492,6 @@ if __name__ == '__main__':
                 triplet_strategy=args['triplet_strategy'],
                 images_per_person=args['images_per_person'],
                 people_per_sample=args['people_per_sample'],
-                pretrained_model=args['pretrained_model'],
                 distance_metric=args['distance_metric'],
                 soft=args['soft'],
                 sigma=args['sigma'],
@@ -501,4 +500,5 @@ if __name__ == '__main__':
                 target_margin=args['target_margin'],
                 distributed=args['distributed'],
                 eager_execution=args['eager_execution'],
-                weights_path=args['weights_path'])
+                weights_path=args['weights_path'],
+                checkpoint_interval=args['checkpoint_interval'])
