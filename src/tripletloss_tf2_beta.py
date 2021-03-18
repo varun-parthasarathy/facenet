@@ -160,7 +160,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                 use_mixed_precision=False, triplet_strategy='', images_per_person=35, 
                 people_per_sample=12, distance_metric="L2", soft=True, 
                 sigma=0.3, decay_margin_rate=0.0, use_lfw=True, target_margin=0.2, distributed=False,
-                eager_execution=False, weights_path='', checkpoint_interval=5000):
+                eager_execution=False, weights_path='', checkpoint_interval=5000, use_metrics=False):
 
     if use_tpu is True:
         assert tpu_name is not None, '[ERROR] TPU name must be specified'
@@ -272,7 +272,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                 if compiled is False:
                     model.compile(optimizer=opt,
                                   loss=loss_fn,
-                                  metrics=[triplet_loss_metrics],
+                                  metrics=[triplet_loss_metrics] if use_metrics is True else None,
                                   run_eagerly=run_eagerly)
         elif distributed is True and use_tpu is False:
             with mirrored_strategy.scope():
@@ -286,7 +286,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                 if compiled is False:
                     model.compile(optimizer=opt,
                                   loss=loss_fn,
-                                  metrics=[triplet_loss_metrics],
+                                  metrics=[triplet_loss_metrics] if use_metrics is True else None,
                                   run_eagerly=run_eagerly)
         else:
             model, compiled = create_neural_network(model_type=model_type,
@@ -296,7 +296,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
             if compiled is False:
                 model.compile(optimizer=opt,
                               loss=loss_fn,
-                              metrics=[triplet_loss_metrics],
+                              metrics=[triplet_loss_metrics] if use_metrics is True else None,
                               run_eagerly=run_eagerly)
 
         callback_list = [range_finder, toggle_metrics]
@@ -345,7 +345,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                 if compiled is False:
                     model.compile(optimizer=opt,
                                   loss=loss_fn,
-                                  metrics=[triplet_loss_metrics],
+                                  metrics=[triplet_loss_metrics] if use_metrics is True else None,
                                   run_eagerly=run_eagerly)
         elif distributed is True and use_tpu is False:
             with mirrored_strategy.scope():
@@ -359,7 +359,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                 if compiled is False:
                     model.compile(optimizer=opt,
                                   loss=loss_fn,
-                                  metrics=[triplet_loss_metrics],
+                                  metrics=[triplet_loss_metrics] if use_metrics is True else None,
                                   run_eagerly=run_eagerly)
         else:
             model, compiled = create_neural_network(model_type=model_type,
@@ -369,10 +369,12 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
             if compiled is False:
                 model.compile(optimizer=opt,
                               loss=loss_fn,
-                              metrics=[triplet_loss_metrics],
+                              metrics=[triplet_loss_metrics] if use_metrics is True else None,
                               run_eagerly=run_eagerly)
 
-        callback_list = [checkpoint_saver, toggle_metrics]
+        callback_list = [checkpoint_saver]
+        if use_metrics is True:
+            callback_list.append(toggle_metrics)
         if decay_margin_callback is not None:
             callback_list.append(decay_margin_callback)
 
@@ -466,6 +468,8 @@ if __name__ == '__main__':
                         help='Path to saved weights/checkpoints (if using saved weights for further training)')
     parser.add_argument('--checkpoint_interval', type=int, default=5000, required=False,
                         help='Frequency of model checkpointing. Default is every 5000 steps')
+    parser.add_argument('--use_metrics', action='store_true',
+                        help='Include triplet metric evaluation during training. Not recommended when checkpointing is mandatory as custom metrics cannot be restored properly')
 
     args = vars(parser.parse_args())
 
@@ -501,4 +505,5 @@ if __name__ == '__main__':
                 distributed=args['distributed'],
                 eager_execution=args['eager_execution'],
                 weights_path=args['weights_path'],
-                checkpoint_interval=args['checkpoint_interval'])
+                checkpoint_interval=args['checkpoint_interval'],
+                use_metrics=args['use_metrics'])
