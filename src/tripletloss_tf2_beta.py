@@ -24,7 +24,8 @@ from dataset_utils import generate_training_dataset, get_test_dataset, get_LFW_d
 from triplet_callbacks_and_metrics import RangeTestCallback, DecayMarginCallback, TripletLossMetrics, ToggleMetricEval
 
 
-def create_neural_network(model_type='resnet50', embedding_size=512, input_shape=None, weights_path=''):
+def create_neural_network(model_type='resnet50', embedding_size=512, input_shape=None, weights_path='',
+                          loss_type='ADAPTIVE', loss_fn=None):
     base_model = None
     if model_type == 'resnet50':
         base_model = ResNet50(weights=None, classes=embedding_size, classifier_activation=None)
@@ -77,11 +78,25 @@ def create_neural_network(model_type='resnet50', embedding_size=512, input_shape
 
     if len(weights_path) > 1 and os.path.exists(weights_path):
         print('[INFO] Attempting to load weights from most recently saved checkpoint')
+        loss_obj = None
         try:
-            model = tf.keras.models.load_model(weights_path)
+            if loss_type == 'ADAPTIVE':
+                loss_obj = ['AdaptiveTripletLoss', loss_fn]
+            elif loss_type == 'FOCAL':
+                loss_obj = ['TripletFocalLoss', loss_fn]
+            elif loss_type == 'BATCH_HARD':
+                loss_obj = ['TripletBatchHardLoss', loss_fn]
+            elif loss_type == 'BATCH_HARD_V2':
+                loss_obj = ['TripletBatchHardV2Loss', loss_fn]
+            else:
+                loss_obj = None
+            if loss_obj is not None:
+                model = tf.keras.models.load_model(weights_path, custom_objects={loss_obj[0]:loss_obj[1]})
+            else:
+                model = tf.keras.models.load_model(weights_path)
             compiled = True
             print('[INFO] Loading model from SavedModel format')
-            print('[WARNING] Model is already compiled; ignoring passed optimizer and learning rate parameters')
+            print('[WARNING] Model is already compiled; ignoring passed optimizer, loss and learning rate parameters')
         except:
             try:
                 latest = tf.train.latest_checkpoint(weights_path)
@@ -267,7 +282,9 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
             with strategy.scope():
                 model, compiled = create_neural_network(model_type=model_type,
                                                         embedding_size=embedding_size,
-                                                        weights_path=weights_path)
+                                                        weights_path=weights_path,
+                                                        loss_type=triplet_strategy,
+                                                        loss_fn=loss_fn)
                 assert model is not None, '[ERROR] There was a problem while loading the pre-trained weights'
                 if compiled is False:
                     model.compile(optimizer=opt,
@@ -278,7 +295,9 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
             with mirrored_strategy.scope():
                 model, compiled = create_neural_network(model_type=model_type,
                                                         embedding_size=embedding_size,
-                                                        weights_path=weights_path)
+                                                        weights_path=weights_path,
+                                                        loss_type=triplet_strategy,
+                                                        loss_fn=loss_fn)
                 opt = get_optimizer(optimizer_name=optimizer,
                                     lr_schedule=1e-5,
                                     weight_decay=weight_decay) # Optimizer must be created within scope!
@@ -291,7 +310,9 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
         else:
             model, compiled = create_neural_network(model_type=model_type,
                                                     embedding_size=embedding_size,
-                                                    weights_path=weights_path)
+                                                    weights_path=weights_path,
+                                                    loss_type=triplet_strategy,
+                                                    loss_fn=loss_fn)
             assert model is not None, '[ERROR] There was a problem while loading the pre-trained weights'
             if compiled is False:
                 model.compile(optimizer=opt,
@@ -340,7 +361,9 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
             with strategy.scope():
                 model, compiled = create_neural_network(model_type=model_type,
                                                         embedding_size=embedding_size,
-                                                        weights_path=weights_path)
+                                                        weights_path=weights_path,
+                                                        loss_type=triplet_strategy,
+                                                        loss_fn=loss_fn)
                 assert model is not None, '[ERROR] There was a problem in loading the pre-trained weights'
                 if compiled is False:
                     model.compile(optimizer=opt,
@@ -351,7 +374,9 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
             with mirrored_strategy.scope():
                 model, compiled = create_neural_network(model_type=model_type,
                                                         embedding_size=embedding_size,
-                                                        weights_path=weights_path)
+                                                        weights_path=weights_path,
+                                                        loss_type=triplet_strategy,
+                                                        loss_fn=loss_fn)
                 opt = get_optimizer(optimizer_name=optimizer,
                                     lr_schedule=lr_schedule,
                                     weight_decay=weight_decay) # Optimizer must be created within scope!
@@ -364,7 +389,9 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
         else:
             model, compiled = create_neural_network(model_type=model_type,
                                                     embedding_size=embedding_size,
-                                                    weights_path=weights_path)
+                                                    weights_path=weights_path,
+                                                    loss_type=triplet_strategy,
+                                                    loss_fn=loss_fn)
             assert model is not None, '[ERROR] There was a problem in loading the pre-trained weights'
             if compiled is False:
                 model.compile(optimizer=opt,
