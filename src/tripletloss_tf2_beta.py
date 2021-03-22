@@ -113,26 +113,27 @@ def create_neural_network(model_type='resnet50', embedding_size=512, input_shape
     
     return model, compiled
 
-def get_learning_rate_schedule(schedule_name, image_count, batch_size, learning_rate=1e-3, max_lr=0.5):
+def get_learning_rate_schedule(schedule_name, image_count, batch_size, learning_rate=1e-3, max_lr=0.5,
+                               step_size=6000):
     lr = None
     if schedule_name == 'triangular2':
         lr = tfa.optimizers.Triangular2CyclicalLearningRate(initial_learning_rate=learning_rate,
                                                            maximal_learning_rate=max_lr,
-                                                           step_size=6*(int(image_count/batch_size)+1),
+                                                           step_size=step_size,
                                                            scale_mode='iterations')
     elif schedule_name == 'triangular':
         lr = tfa.optimizers.TriangularCyclicalLearningRate(initial_learning_rate=learning_rate,
                                                            maximal_learning_rate=max_lr,
-                                                           step_size=6*(int(image_count/batch_size)+1),
+                                                           step_size=step_size,
                                                            scale_mode='iterations')
     elif schedule_name == 'exponential_decay':
         lr = tf.keras.optimizers.schedules.ExponentialDecay(initial_learning_rate=learning_rate,
-                                                            decay_steps=5*(int(image_count/batch_size)+1),
+                                                            decay_steps=step_size,
                                                             decay_rate=0.96,
                                                             staircase=False)
     elif schedule_name == 'staircase':
         lr = tf.keras.optimizers.schedules.ExponentialDecay(initial_learning_rate=learning_rate,
-                                                            decay_steps=5*(int(image_count/batch_size)+1),
+                                                            decay_steps=step_size,
                                                             decay_rate=0.96,
                                                             staircase=True)
     else:
@@ -175,7 +176,8 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                 use_mixed_precision=False, triplet_strategy='', images_per_person=35, 
                 people_per_sample=12, distance_metric="L2", soft=True, 
                 sigma=0.3, decay_margin_rate=0.0, use_lfw=True, target_margin=0.2, distributed=False,
-                eager_execution=False, weights_path='', checkpoint_interval=5000, use_metrics=False):
+                eager_execution=False, weights_path='', checkpoint_interval=5000, use_metrics=False,
+                step_size=6000):
 
     if use_tpu is True:
         assert tpu_name is not None, '[ERROR] TPU name must be specified'
@@ -342,7 +344,8 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                                  learning_rate=init_lr,
                                                  max_lr=max_lr,
                                                  image_count=n_imgs,
-                                                 batch_size=batch_size)
+                                                 batch_size=batch_size,
+                                                 step_size=step_size)
         opt = get_optimizer(optimizer_name=optimizer,
                             lr_schedule=lr_schedule,
                             weight_decay=weight_decay)
@@ -497,6 +500,8 @@ if __name__ == '__main__':
                         help='Frequency of model checkpointing. Default is every 5000 steps')
     parser.add_argument('--use_metrics', action='store_true',
                         help='Include triplet metric evaluation during training. Not recommended when checkpointing is mandatory as custom metrics cannot be restored properly')
+    parser.add_argument('--step_size', type=int, default=6000, required=False,
+                        help='Step size for cyclic learning rate policies')
 
     args = vars(parser.parse_args())
 
@@ -533,4 +538,5 @@ if __name__ == '__main__':
                 eager_execution=args['eager_execution'],
                 weights_path=args['weights_path'],
                 checkpoint_interval=args['checkpoint_interval'],
-                use_metrics=args['use_metrics'])
+                use_metrics=args['use_metrics'],
+                step_size=args['step_size'])
