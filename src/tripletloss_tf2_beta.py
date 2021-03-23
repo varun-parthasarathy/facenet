@@ -19,7 +19,7 @@ from tensorflow.keras.applications.mobilenet_v2 import MobileNetV2
 from tensorflow.keras.applications.inception_v3 import InceptionV3
 from tensorflow.keras.applications.inception_resnet_v2 import InceptionResNetV2
 from tensorflow.keras.mixed_precision import experimental as mixed_precision
-from custom_triplet_loss import TripletBatchHardLoss, TripletFocalLoss, TripletBatchHardV2Loss
+from custom_triplet_loss import TripletBatchHardLoss, TripletFocalLoss, TripletBatchHardV2Loss, AssortedTripletLoss
 from dataset_utils import generate_training_dataset, get_test_dataset, get_LFW_dataset
 from triplet_callbacks_and_metrics import RangeTestCallback, DecayMarginCallback, TripletLossMetrics, ToggleMetricEval
 
@@ -88,6 +88,8 @@ def create_neural_network(model_type='resnet50', embedding_size=512, input_shape
                 loss_obj = ['TripletBatchHardLoss', loss_fn]
             elif loss_type == 'BATCH_HARD_V2':
                 loss_obj = ['TripletBatchHardV2Loss', loss_fn]
+            elif loss_type == 'ASSORTED':
+                loss_obj = ['AssortedTripletLoss', loss_fn]
             else:
                 loss_obj = None
             if loss_obj is not None:
@@ -255,6 +257,12 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                       lambda_=sigma)
         run_eagerly = True
         print('[INFO] Using Adaptive Triplet Loss')
+    elif triplet_strategy == 'ASSORTED':
+        loss_fn = AssortedTripletLoss(margin=margin,
+                                      focal=soft,
+                                      sigma=sigma,
+                                      distance_metric=distance_metric)
+        print('[INFO] Using assorted triplet loss')
     else:
         loss_fn = TripletFocalLoss(margin=margin,
                                    sigma=sigma,
@@ -471,7 +479,7 @@ if __name__ == '__main__':
     parser.add_argument('--use_mixed_precision', action='store_true',
                         help='Use mixed precision for training. Can greatly reduce memory consumption')
     parser.add_argument('--triplet_strategy', type=str, default='FOCAL',
-                        choices=['VANILLA', 'BATCH_HARD', 'BATCH_HARD_V2', 'FOCAL', 'ADAPTIVE'],
+                        choices=['VANILLA', 'BATCH_HARD', 'BATCH_HARD_V2', 'FOCAL', 'ADAPTIVE', 'ASSORTED'],
                         help='Choice of triplet loss formulation. Default is FOCAL')
     parser.add_argument('--images_per_person', required=False, type=int, default=35,
                         help='Average number of images per class. Default is 35 (from MS1M cleaned + AsianCeleb)')
@@ -481,7 +489,7 @@ if __name__ == '__main__':
                         choices=['L2', 'squared-L2', 'angular'],
                         help='Choice of distance metric. Default is Euclidean distance')
     parser.add_argument('--soft', action='store_true',
-                        help='Use soft margin for BATCH_HARD strategy')
+                        help='Use soft margin. For ASSORTED strategy, sets whether to use triplet focal loss or not')
     parser.add_argument('--sigma', type=float, required=False, default=0.3,
                         help='Value of sigma for FOCAL strategy. For ADAPTIVE strategy, specifies lambda')
     parser.add_argument('--decay_margin_rate', type=float, required=False, default=0.0,
