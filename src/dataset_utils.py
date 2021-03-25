@@ -132,8 +132,8 @@ def generate_training_dataset(data_path, image_size, batch_size, crop_size, cach
         ds = ds.cache(cache)
     ds = ds.shuffle(batches+1, reshuffle_each_iteration=True)
     ds = ds.unbatch()
-    ds = ds.batch(batch_size).map(lambda x: tf.random.shuffle(x), num_parallel_calls=AUTOTUNE)
-    ds = ds.unbatch().map(process_path, num_parallel_calls=AUTOTUNE)
+    #ds = ds.batch(batch_size).map(lambda x: tf.random.shuffle(x), num_parallel_calls=AUTOTUNE).unbatch()
+    ds = ds.map(process_path, num_parallel_calls=AUTOTUNE)
     ds = ds.batch(batch_size)
     #ds = ds.repeat() # Is this needed?
     ds = ds.prefetch(AUTOTUNE)
