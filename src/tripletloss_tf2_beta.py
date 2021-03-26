@@ -277,7 +277,8 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
     else:
         decay_margin_callback = None
 
-    tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir="./logs", update_freq=checkpoint_interval)
+    tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir="./logs", update_freq=100,
+                                                          write_graph=False)
 
     triplet_loss_metrics = TripletLossMetrics(test_images, embedding_size)
     toggle_metrics = ToggleMetricEval()
