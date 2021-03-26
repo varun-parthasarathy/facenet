@@ -277,6 +277,8 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
     else:
         decay_margin_callback = None
 
+    tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir="./logs", update_freq=checkpoint_interval)
+
     triplet_loss_metrics = TripletLossMetrics(test_images, embedding_size)
     toggle_metrics = ToggleMetricEval()
 
@@ -330,20 +332,16 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                               metrics=[triplet_loss_metrics] if use_metrics is True else None,
                               run_eagerly=run_eagerly)
 
-        callback_list = [range_finder, toggle_metrics]
+        callback_list = [range_finder, tensorboard_callback]
+        if use_metrics is True:
+            callback_list.append(toggle_metrics)
         if decay_margin_callback is not None:
             callback_list.append(decay_margin_callback)
 
         train_history = model.fit(train_dataset, epochs=5, 
                                   callbacks=callback_list, 
                                   validation_data=test_dataset)
-        plt.xscale('log')
-        plt.plot(train_history.lrs, train_history.losses, color='blue')
-        smooth_losses = savgol_filter(train_history.losses, 7, 3)
-        plt.plot(train_history.lrs, smooth_losses, color='red')
-        plt.xlabel('Log learning rate')
-        plt.ylabel('Loss')
-        plt.savefig('./range_test_result.png')
+
         print('\n[INFO] Training complete. Range test results can be found at "./range_test_result.png"')
 
         return
@@ -410,7 +408,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                               metrics=[triplet_loss_metrics] if use_metrics is True else None,
                               run_eagerly=run_eagerly)
 
-        callback_list = [checkpoint_saver]
+        callback_list = [checkpoint_saver, tensorboard_callback]
         if use_metrics is True:
             callback_list.append(toggle_metrics)
         if decay_margin_callback is not None:
