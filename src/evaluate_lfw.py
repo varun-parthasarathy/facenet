@@ -268,9 +268,10 @@ def main(weights_path, lfw_path, image_size, crop_size, model_type, loss_type,
     embeddings = np.zeros((nrof_images, embedding_size))
     labels = np.zeros((nrof_images,))
     start_idx = 0
+    print('[INFO] There are %d images to process in the dataset' % (nrof_images))
 
     for i, (xs, ys) in enumerate(lfw_ds):
-        print('Processing batch : %d' % (i+1))
+        print('Processing batch : %d of %d' % (i+1, int(nrof_images / batch_size)+1))
         embs = model.predict(xs)
         end_idx = start_idx + np.squeeze(embs).shape[0]
         labels[start_idx:end_idx] = np.squeeze(ys)
