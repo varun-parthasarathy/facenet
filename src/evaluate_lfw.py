@@ -16,6 +16,73 @@ from scipy import interpolate
 from custom_triplet_loss import TripletBatchHardLoss, TripletFocalLoss, TripletBatchHardV2Loss, AssortedTripletLoss
 from adaptive_triplet_loss import AdaptiveTripletLoss
 
+def _get_paths(lfw_dir, pairs):
+    nrof_skipped_pairs = 0
+    path_list = []
+    issame_list = []
+    classes = set()
+    for pair in pairs:
+        if len(pair) == 3:
+            path0 = _add_extension(os.path.join(lfw_dir, pair[0], pair[0] + '_' + '%04d' % int(pair[1])))
+            path1 = _add_extension(os.path.join(lfw_dir, pair[0], pair[0] + '_' + '%04d' % int(pair[2])))
+            issame = True
+            classes.add(pair[0])
+        elif len(pair) == 4:
+            path0 = _add_extension(os.path.join(lfw_dir, pair[0], pair[0] + '_' + '%04d' % int(pair[1])))
+            path1 = _add_extension(os.path.join(lfw_dir, pair[2], pair[2] + '_' + '%04d' % int(pair[3])))
+            issame = False
+            classes.add(pair[0])
+            classes.add(pair[2])
+        if os.path.exists(path0) and os.path.exists(path1):    # Only add the pair if both paths exist
+            #path_list += (path0,path1)
+            path_list.append(path0)
+            path_list.append(path1)
+            issame_list.append(issame)
+        else:
+            nrof_skipped_pairs += 1
+    if nrof_skipped_pairs>0:
+        print('[INFO] Skipped %d image pairs' % nrof_skipped_pairs)
+    
+    return path_list, issame_list, list(classes)
+  
+def _add_extension(path):
+    if os.path.exists(path+'.jpg'):
+        return path+'.jpg'
+    elif os.path.exists(path+'.png'):
+        return path+'.png'
+    else:
+        raise RuntimeError('No file "%s" with extension png or jpg.' % path)
+
+def _read_pairs(pairs_filename):
+    pairs = []
+    with open(pairs_filename, 'r') as f:
+        for line in f.readlines()[1:]:
+            pair = line.strip().split()
+            pairs.append(pair)
+    return np.array(pairs)
+
+def _get_preprocessor(model_type):
+    if model_type[0:6] == 'resnet':
+        preprocessor = 'tensorflow.keras.applications.resnet'
+    elif model_type[0:13] == 'efficientnet':
+        preprocessor = 'tensorflow.keras.applications.efficientnet'
+    elif model_type == 'xception':
+        preprocessor = 'tensorflow.keras.applications.xception'
+    elif model_type == 'inception_v3':
+        preprocessor = 'tensorflow.keras.applications.inception_v3'
+    elif model_type == 'inception_resnet_v2':
+        preprocessor = 'tensorflow.keras.applications.inception_resnet_v2'
+    elif model_type == 'mobilenet':
+        preprocessor = 'tensorflow.keras.applications.mobilenet'
+    elif model_type == 'mobilenet_v2':
+        preprocessor = 'tensorflow.keras.applications.mobilenet_v2'
+    else:
+        preprocessor = None
+
+    if preprocessor is not None:
+        preprocessor = importlib.import_module(preprocessor)
+
+    return preprocessor
 
 def get_LFW_dataset(data_path, image_size, batch_size, crop_size, cache='', train_classes=0,
                     use_mixed_precision=False, use_tpu=False, model_type=None):
@@ -172,15 +239,15 @@ def main(weights_path, lfw_path, image_size, crop_size, model_type, loss_type,
          batch_size=30, use_mixed_precision=False, use_tpu=False, embedding_size=512):
     model = None
     if loss_type == 'ADAPTIVE':
-        loss_obj = ['AdaptiveTripletLoss', loss_fn]
+        loss_obj = ['AdaptiveTripletLoss', AdaptiveTripletLoss]
     elif loss_type == 'FOCAL':
-        loss_obj = ['TripletFocalLoss', loss_fn]
+        loss_obj = ['TripletFocalLoss', TripletFocalLoss]
     elif loss_type == 'BATCH_HARD':
-        loss_obj = ['TripletBatchHardLoss', loss_fn]
+        loss_obj = ['TripletBatchHardLoss', TripletBatchHardLoss]
     elif loss_type == 'BATCH_HARD_V2':
-        loss_obj = ['TripletBatchHardV2Loss', loss_fn]
+        loss_obj = ['TripletBatchHardV2Loss', TripletBatchHardV2Loss]
     elif loss_type == 'ASSORTED':
-        loss_obj = ['AssortedTripletLoss', loss_fn]
+        loss_obj = ['AssortedTripletLoss', AssortedTripletLoss]
     else:
         loss_obj = None
     if loss_obj is not None:
@@ -188,7 +255,7 @@ def main(weights_path, lfw_path, image_size, crop_size, model_type, loss_type,
     else:
         model = tf.keras.models.load_model(weights_path)
 
-    lfw_ds, test_images, _ = get_LFW_dataset(data_path=lfw_path, 
+    lfw_ds, nrof_images, _ = get_LFW_dataset(data_path=lfw_path, 
                                              image_size=image_size, 
                                              batch_size=batch_size,
                                              crop_size=crop_size,
@@ -202,7 +269,8 @@ def main(weights_path, lfw_path, image_size, crop_size, model_type, loss_type,
     labels = np.zeros((nrof_images,))
     start_idx = 0
 
-    for xs, ys in lfw_ds:
+    for i, (xs, ys) in enumerate(lfw_ds):
+        print('Processing batch : %d' % (i+1))
         embs = model.predict(xs)
         end_idx = start_idx + np.squeeze(embs).shape[0]
         labels[start_idx:end_idx] = np.squeeze(ys)
@@ -254,5 +322,5 @@ if __name__ == '__main__':
          lfw_path=args['lfw_path'],
          image_size=args['image_size'],
          crop_size=args['crop_size'],
-         model_type=args['model_type'],
+         model_type=args['model'],
          loss_type=args['loss_type'])
