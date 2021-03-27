@@ -138,6 +138,8 @@ def get_learning_rate_schedule(schedule_name, image_count, batch_size, learning_
                                                             decay_steps=step_size,
                                                             decay_rate=0.96,
                                                             staircase=True)
+    elif schedule_name == 'constant':
+        lr = learning_rate
     else:
         pass
 
@@ -440,7 +442,7 @@ if __name__ == '__main__':
     parser.add_argument('-c', '--crop_size', required=False, type=int, default=224,
                         help='Image size after random crop is applied')
     parser.add_argument('--lr_schedule', required=False, type=str, default='triangular2',
-                        choices=['triangular2', 'triangular', 'staircase', 'exponential_decay'],
+                        choices=['triangular2', 'triangular', 'staircase', 'exponential_decay', 'constant'],
                         help='Choice of learning rate schedule. Default is a cyclic policy')
     parser.add_argument('--init_lr', required=False, type=float, default=0.001,
                         help='Initial learning rate')
