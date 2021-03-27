@@ -1,20 +1,20 @@
 """Validate a face recognizer on the "Labeled Faces in the Wild" dataset (http://vis-www.cs.umass.edu/lfw/).
 Embeddings are calculated using the pairs from http://vis-www.cs.umass.edu/lfw/pairs.txt and the ROC curve
-is calculated and plotted. Both the model metagraph and the model parameters need to exist
-in the same directory, and the metagraph should have the extension '.meta'.
+is calculated and plotted.
 """
-import tensorflow as tf
-import numpy as np
-import argparse
-import facenet
-import lfw
 import os
 import sys
+import math
+import argparse
+import numpy as np
+from scipy import misc
+import tensorflow as tf
 from sklearn import metrics
-from scipy.optimize import brentq
 from scipy import interpolate
-from custom_triplet_loss import TripletBatchHardLoss, TripletFocalLoss, TripletBatchHardV2Loss, AssortedTripletLoss
+from scipy.optimize import brentq
+from sklearn.model_selection import KFold
 from adaptive_triplet_loss import AdaptiveTripletLoss
+from custom_triplet_loss import TripletBatchHardLoss, TripletFocalLoss, TripletBatchHardV2Loss, AssortedTripletLoss
 
 def _get_paths(lfw_dir, pairs):
     nrof_skipped_pairs = 0
@@ -84,15 +84,16 @@ def _get_preprocessor(model_type):
 
     return preprocessor
 
-def get_LFW_dataset(data_path, image_size, batch_size, crop_size, cache='', train_classes=0,
+def get_LFW_dataset(data_path, image_size, batch_size, crop_size, train_classes=0,
                     use_mixed_precision=False, use_tpu=False, model_type=None):
     AUTOTUNE = tf.data.experimental.AUTOTUNE
     assert batch_size % 2 == 0, '[ERROR] Batch size must be a multiple of 2'
     pairs = _read_pairs('./data/pairs.txt')
-    path_list, _, CLASS_NAMES = _get_paths(data_path, pairs)
+    path_list, actual_issame, CLASS_NAMES = _get_paths(data_path, pairs)
     CLASS_NAMES.sort()
     CLASS_NAMES = np.array(CLASS_NAMES)
     image_count = len(path_list)
+    assert image_count % batch_size == 0, '[ERROR] Batch size must perfectly divide number of images'
     preprocessor = _get_preprocessor(model_type)
 
     ds = tf.data.Dataset.from_tensor_slices(path_list)
@@ -126,13 +127,11 @@ def get_LFW_dataset(data_path, image_size, batch_size, crop_size, cache='', trai
         #img = tf.image.random_flip_left_right(img)
         return img, label
 
-    ds = ds.map(process_path, num_parallel_calls=AUTOTUNE)
-    if len(cache) > 1:
-        ds = ds.cache(cache)
+    ds = ds.map(process_path, num_parallel_calls=AUTOTUNE, deterministic=True)
     ds = ds.batch(batch_size)
     ds = ds.prefetch(AUTOTUNE)
 
-    return ds, image_count, len(CLASS_NAMES)
+    return ds, image_count, len(CLASS_NAMES), actual_issame
 
 def _distance(embeddings1, embeddings2, distance_metric=0):
     if distance_metric==0:
@@ -255,16 +254,16 @@ def main(weights_path, lfw_path, image_size, crop_size, model_type, loss_type,
     else:
         model = tf.keras.models.load_model(weights_path)
 
-    lfw_ds, nrof_images, _ = get_LFW_dataset(data_path=lfw_path, 
-                                             image_size=image_size, 
-                                             batch_size=batch_size,
-                                             crop_size=crop_size,
-                                             cache='',
-                                             use_mixed_precision=use_mixed_precision,
-                                             use_tpu=use_tpu,
-                                             train_classes=0,
-                                             model_type=model_type)
+    lfw_ds, nrof_images, _, actual_issame = get_LFW_dataset(data_path=lfw_path, 
+                                                            image_size=image_size, 
+                                                            batch_size=batch_size,
+                                                            crop_size=crop_size,
+                                                            use_mixed_precision=use_mixed_precision,
+                                                            use_tpu=use_tpu,
+                                                            train_classes=0,
+                                                            model_type=model_type)
 
+    actual_issame = np.asarray(actual_issame)
     embeddings = np.zeros((nrof_images, embedding_size))
     labels = np.zeros((nrof_images,))
     start_idx = 0
@@ -284,7 +283,18 @@ def main(weights_path, lfw_path, image_size, crop_size, model_type, loss_type,
     embeddings1 = y_pred[0::2]
     embeddings2 = y_pred[1::2]
     y_true = labels
-    actual_issame = np.equal(y_true[0::2], y_true[1::2])
+    issame = np.equal(y_true[0::2], y_true[1::2])
+
+    if np.all(actual_issame == issame) is False:
+        count = 0
+        for i in range(len(actual_issame)):
+            if actual_issame[i] != issame[i]:
+                count += 1
+                print('%d : ' % (i+1), end='')
+                print(actual_issame[i] + ' ' + issame[i])
+        print('[ERROR] %d mismatches in labels!' % (count))
+        raise AssertionError('[ERROR] There was a problem in creating the dataset. Please check the labels')
+
     tpr, fpr, accuracy, acc_std = _calculate_roc(thresholds, embeddings1, embeddings2,
                                                  actual_issame, nrof_folds=10, distance_metric=0)
     thresholds = np.arange(0, 2, 0.001)
