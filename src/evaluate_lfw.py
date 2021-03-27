@@ -235,7 +235,8 @@ def _calculate_val_far(threshold, dist, actual_issame):
     return val, far
 
 def main(weights_path, lfw_path, image_size, crop_size, model_type, loss_type,
-         batch_size=30, use_mixed_precision=False, use_tpu=False, embedding_size=512):
+         batch_size=30, use_mixed_precision=False, use_tpu=False, embedding_size=512,
+         load_from_file=False):
     model = None
     if loss_type == 'ADAPTIVE':
         loss_obj = ['AdaptiveTripletLoss', AdaptiveTripletLoss]
@@ -269,13 +270,19 @@ def main(weights_path, lfw_path, image_size, crop_size, model_type, loss_type,
     start_idx = 0
     print('[INFO] There are %d images to process in the dataset' % (nrof_images))
 
-    for i, (xs, ys) in enumerate(lfw_ds):
-        print('Processing batch : %d of %d' % (i+1, int(nrof_images / batch_size)), flush=True)
-        embs = model.predict(xs)
-        end_idx = start_idx + np.squeeze(embs).shape[0]
-        labels[start_idx:end_idx] = np.squeeze(ys)
-        embeddings[start_idx:end_idx] = np.squeeze(embs)
-        start_idx = end_idx
+    if load_from_file is None or load_from_file is False:
+        for i, (xs, ys) in enumerate(lfw_ds):
+            print('Processing batch : %d of %d' % (i+1, int(nrof_images / batch_size)), flush=True)
+            embs = model.predict(xs)
+            end_idx = start_idx + np.squeeze(embs).shape[0]
+            labels[start_idx:end_idx] = np.squeeze(ys)
+            embeddings[start_idx:end_idx] = np.squeeze(embs)
+            start_idx = end_idx
+        np.save('./embeddings.npy', embeddings)
+        np.save('./labels.npy', labels)
+    else:
+        embeddings = np.load('./embeddings.npy')
+        labels = np.load('./labels.npy')
 
     result_string = 'Accuracy : {}%+-{}% :: Validation rate : {}%+-{}% @FAR : {} :: AUC : {} :: EER : {}'
     thresholds = np.arange(0, 2, 0.01)
@@ -304,7 +311,7 @@ def main(weights_path, lfw_path, image_size, crop_size, model_type, loss_type,
     eer = brentq(lambda x: 1. - x - interpolate.interp1d(fpr, tpr)(x), 0., 1.)
     acc = np.mean(accuracy)
 
-    result_string.format(acc, acc_std, val, val_std, far, auc, eer)
+    result_string = result_string.format(acc, acc_std, val, val_std, far, auc, eer)
     print(result_string)
     
 
@@ -327,6 +334,8 @@ if __name__ == '__main__':
     parser.add_argument('--loss_type', type=str, default='FOCAL',
                         choices=['VANILLA', 'BATCH_HARD', 'BATCH_HARD_V2', 'FOCAL', 'ADAPTIVE', 'ASSORTED'],
                         help='Choice of triplet loss formulation. Default is FOCAL')
+    parser.add_argument('--load_from_file', action='store_true',
+                        help='Load embeddings and labels from file instead of running inference again')
 
     args = vars(parser.parse_args())
     main(weights_path=args['weights_path'],
@@ -334,4 +343,5 @@ if __name__ == '__main__':
          image_size=args['image_size'],
          crop_size=args['crop_size'],
          model_type=args['model'],
-         loss_type=args['loss_type'])
+         loss_type=args['loss_type'],
+         load_from_file=args['load_from_file'])
