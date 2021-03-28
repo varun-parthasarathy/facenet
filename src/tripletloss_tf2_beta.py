@@ -25,7 +25,7 @@ from triplet_callbacks_and_metrics import RangeTestCallback, DecayMarginCallback
 
 
 def create_neural_network(model_type='resnet50', embedding_size=512, input_shape=None, weights_path='',
-                          loss_type='ADAPTIVE', loss_fn=None):
+                          loss_type='ADAPTIVE', loss_fn=None, recompile=False):
     base_model = None
     if model_type == 'resnet50':
         base_model = ResNet50(weights=None, classes=embedding_size, classifier_activation=None)
@@ -96,9 +96,13 @@ def create_neural_network(model_type='resnet50', embedding_size=512, input_shape
                 model = tf.keras.models.load_model(weights_path, custom_objects={loss_obj[0]:loss_obj[1]})
             else:
                 model = tf.keras.models.load_model(weights_path)
-            compiled = True
+            if recompile is None or recompile is False:
+                compiled = True
+                print('[WARNING] Model is already compiled; ignoring passed optimizer, loss and learning rate parameters')
+            else:
+                compiled = False
+                print('[WARNING] Model will be compiled again. If you wish to start from a previously saved optimizer state, this is not recommended')
             print('[INFO] Loading model from SavedModel format')
-            print('[WARNING] Model is already compiled; ignoring passed optimizer, loss and learning rate parameters')
         except:
             try:
                 latest = tf.train.latest_checkpoint(weights_path)
@@ -181,7 +185,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                 people_per_sample=12, distance_metric="L2", soft=True, 
                 sigma=0.3, decay_margin_rate=0.0, use_lfw=True, target_margin=0.2, distributed=False,
                 eager_execution=False, weights_path='', checkpoint_interval=5000, use_metrics=False,
-                step_size=6000):
+                step_size=6000, recompile=False):
 
     if use_tpu is True:
         assert tpu_name is not None, '[ERROR] TPU name must be specified'
@@ -299,7 +303,8 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                                         embedding_size=embedding_size,
                                                         weights_path=weights_path,
                                                         loss_type=triplet_strategy,
-                                                        loss_fn=loss_fn)
+                                                        loss_fn=loss_fn,
+                                                        recompile=recompile)
                 assert model is not None, '[ERROR] There was a problem while loading the pre-trained weights'
                 if compiled is False:
                     model.compile(optimizer=opt,
@@ -312,7 +317,8 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                                         embedding_size=embedding_size,
                                                         weights_path=weights_path,
                                                         loss_type=triplet_strategy,
-                                                        loss_fn=loss_fn)
+                                                        loss_fn=loss_fn,
+                                                        recompile=recompile)
                 opt = get_optimizer(optimizer_name=optimizer,
                                     lr_schedule=1e-5,
                                     weight_decay=weight_decay) # Optimizer must be created within scope!
@@ -327,7 +333,8 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                                     embedding_size=embedding_size,
                                                     weights_path=weights_path,
                                                     loss_type=triplet_strategy,
-                                                    loss_fn=loss_fn)
+                                                    loss_fn=loss_fn,
+                                                    recompile=recompile)
             assert model is not None, '[ERROR] There was a problem while loading the pre-trained weights'
             if compiled is False:
                 model.compile(optimizer=opt,
@@ -375,7 +382,8 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                                         embedding_size=embedding_size,
                                                         weights_path=weights_path,
                                                         loss_type=triplet_strategy,
-                                                        loss_fn=loss_fn)
+                                                        loss_fn=loss_fn,
+                                                        recompile=recompile)
                 assert model is not None, '[ERROR] There was a problem in loading the pre-trained weights'
                 if compiled is False:
                     model.compile(optimizer=opt,
@@ -388,7 +396,8 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                                         embedding_size=embedding_size,
                                                         weights_path=weights_path,
                                                         loss_type=triplet_strategy,
-                                                        loss_fn=loss_fn)
+                                                        loss_fn=loss_fn,
+                                                        recompile=recompile)
                 opt = get_optimizer(optimizer_name=optimizer,
                                     lr_schedule=lr_schedule,
                                     weight_decay=weight_decay) # Optimizer must be created within scope!
@@ -403,7 +412,8 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                                     embedding_size=embedding_size,
                                                     weights_path=weights_path,
                                                     loss_type=triplet_strategy,
-                                                    loss_fn=loss_fn)
+                                                    loss_fn=loss_fn,
+                                                    recompile=recompile)
             assert model is not None, '[ERROR] There was a problem in loading the pre-trained weights'
             if compiled is False:
                 model.compile(optimizer=opt,
@@ -511,6 +521,8 @@ if __name__ == '__main__':
                         help='Include triplet metric evaluation during training. Not recommended when checkpointing is mandatory as custom metrics cannot be restored properly')
     parser.add_argument('--step_size', type=int, default=6000, required=False,
                         help='Step size for cyclic learning rate policies')
+    parser.add_argument('--recompile', action='store_true',
+                        help='Recompile model. Recommended for constant learning rate')
 
     args = vars(parser.parse_args())
 
@@ -548,4 +560,5 @@ if __name__ == '__main__':
                 weights_path=args['weights_path'],
                 checkpoint_interval=args['checkpoint_interval'],
                 use_metrics=args['use_metrics'],
-                step_size=args['step_size'])
+                step_size=args['step_size'],
+                recompile=args['recompile'])
