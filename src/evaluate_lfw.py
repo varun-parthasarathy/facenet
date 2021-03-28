@@ -311,7 +311,7 @@ def main(weights_path, lfw_path, image_size, crop_size, model_type, loss_type,
     eer = brentq(lambda x: 1. - x - interpolate.interp1d(fpr, tpr)(x), 0., 1.)
     acc = np.mean(accuracy)
 
-    result_string = result_string.format(acc, acc_std, val, val_std, far, auc, eer)
+    result_string = result_string.format(acc*100, acc_std*100, val*100, val_std*100, far, auc, eer)
     print(result_string)
     
 
