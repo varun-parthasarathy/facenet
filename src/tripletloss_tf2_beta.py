@@ -348,8 +348,8 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
         if decay_margin_callback is not None:
             callback_list.append(decay_margin_callback)
 
-        train_history = model.fit(train_dataset, epochs=5, 
-                                  callbacks=callback_list, 
+        train_history = model.fit(train_dataset, epochs=num_epochs, 
+                                  callbacks=callback_list,
                                   validation_data=test_dataset)
 
         print('\n[INFO] Training complete. Range test results can be found at "./range_test_result.png"')
