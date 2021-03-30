@@ -290,8 +290,8 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
     toggle_metrics = ToggleMetricEval()
 
     if range_test is True:
-        range_finder = RangeTestCallback(start_lr=1e-5,
-                                         end_lr=10,
+        range_finder = RangeTestCallback(start_lr=init_lr,
+                                         end_lr=max_lr,
                                          n_imgs=n_imgs,
                                          batch_size=batch_size)
         opt = get_optimizer(optimizer_name=optimizer,
