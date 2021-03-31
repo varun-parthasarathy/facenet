@@ -286,6 +286,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
     log_dir = './logs/log_' + datetime.now().strftime("%Y%m%d_%H%M%S")
     tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=log_dir, update_freq=100,
                                                           write_graph=False)
+    stop_on_nan = tf.keras.callbacks.TerminateOnNaN()
 
     triplet_loss_metrics = TripletLossMetrics(test_images, embedding_size)
     toggle_metrics = ToggleMetricEval()
@@ -343,7 +344,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                               metrics=[triplet_loss_metrics] if use_metrics is True else None,
                               run_eagerly=run_eagerly)
 
-        callback_list = [range_finder, tensorboard_callback]
+        callback_list = [range_finder, tensorboard_callback, stop_on_nan]
         if use_metrics is True:
             callback_list.append(toggle_metrics)
         if decay_margin_callback is not None:
@@ -422,7 +423,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                               metrics=[triplet_loss_metrics] if use_metrics is True else None,
                               run_eagerly=run_eagerly)
 
-        callback_list = [checkpoint_saver, tensorboard_callback]
+        callback_list = [checkpoint_saver, tensorboard_callback, stop_on_nan]
         if use_metrics is True:
             callback_list.append(toggle_metrics)
         if decay_margin_callback is not None:
