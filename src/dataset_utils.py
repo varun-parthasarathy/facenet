@@ -108,7 +108,7 @@ def generate_training_dataset(data_path, image_size, batch_size, crop_size, cach
 
     def decode_img(img):
         #img = tf.io.decode_image(img, channels=3, expand_animations=False)
-        img = tf.io.decode_png(img)
+        img = tf.io.decode_png(img, channels=3)
         if use_mixed_precision is True:
             if use_tpu is True:
                 img = tf.cast(img, tf.bfloat16)
@@ -117,8 +117,12 @@ def generate_training_dataset(data_path, image_size, batch_size, crop_size, cach
         else:
             img = tf.cast(img, tf.float32)
         img = tf.image.resize(img, [image_size, image_size])
-        if tf.shape(img)[-1] == 1:
+        '''if tf.shape(img)[-1] == 1:
             img = tf.image.grayscale_to_rgb(img)
+        elif len(tf.shape(img)) == 2:
+            img = tf.image.grayscale_to_rgb(tf.expand_dims(img, axis=-1))
+        else:
+            pass'''
         return img
 
     def process_path(file_path):
@@ -170,7 +174,7 @@ def get_test_dataset(data_path, image_size, batch_size, crop_size, cache='', tra
 
     def decode_img(img):
         #img = tf.io.decode_image(img, channels=3, expand_animations=False)
-        img = tf.io.decode_png(img)
+        img = tf.io.decode_png(img, channels=3)
         if use_mixed_precision is True:
             if use_tpu is True:
                 img = tf.cast(img, tf.bfloat16)
@@ -225,7 +229,7 @@ def get_LFW_dataset(data_path, image_size, batch_size, crop_size, cache='', trai
 
     def decode_img(img):
         #img = tf.io.decode_image(img, channels=3, expand_animations=False)
-        img = tf.io.decode_png(img)
+        img = tf.io.decode_png(img, channels=3)
         if use_mixed_precision is True:
             if use_tpu is True:
                 img = tf.cast(img, tf.bfloat16)
