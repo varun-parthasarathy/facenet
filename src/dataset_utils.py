@@ -109,6 +109,8 @@ def generate_training_dataset(data_path, image_size, batch_size, crop_size, cach
         else:
             img = tf.cast(img, tf.float32)
         img = tf.image.resize(img, [image_size, image_size])
+        if tf.shape(img)[-1] == 1:
+            img = tf.image.grayscale_to_rgb(img)
         return img
 
     def process_path(file_path):
