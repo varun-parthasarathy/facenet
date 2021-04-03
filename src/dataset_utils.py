@@ -59,8 +59,8 @@ def _read_pairs(pairs_filename):
 def _get_preprocessor(model_type):
     if model_type[0:6] == 'resnet':
         preprocessor = 'tensorflow.keras.applications.resnet'
-        #elif model_type[0:13] == 'efficientnet':
-        #preprocessor = 'tensorflow.keras.applications.efficientnet'
+    elif model_type[0:13] == 'efficientnet':
+        preprocessor = 'tensorflow.keras.applications.efficientnet'
     elif model_type == 'xception':
         preprocessor = 'tensorflow.keras.applications.xception'
     elif model_type == 'inception_v3':
