@@ -135,8 +135,8 @@ def generate_training_dataset(data_path, image_size, batch_size, crop_size, cach
             img = img / 255.
         img = tf.image.random_crop(img, [crop_size, crop_size, 3])
         img = tf.image.random_flip_left_right(img)
-        img = tf.image.random_brightness(img, 0.2)
-        img = tf.image.random_contrast(img, 0.0, 0.2)
+        img = tf.image.random_brightness(img, 0.3)
+        #img = tf.image.random_contrast(img, 0.6, 1.0)
         #img = tf.image.random_jpeg_quality(img, 70, 100)
         return img, label
 
