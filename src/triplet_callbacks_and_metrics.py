@@ -198,6 +198,7 @@ class RangeTestCallback(tf.keras.callbacks.Callback):
 
     def on_batch_end(self, batch, logs={}):
         lr = float(tf.keras.backend.get_value(self.model.optimizer.lr))
+        old_lr = lr
         self.lrs.append(lr)
         self.losses.append(logs.get('loss'))
         lr += self.by
@@ -212,6 +213,7 @@ class RangeTestCallback(tf.keras.callbacks.Callback):
             plt.ylabel('Loss')
             plt.savefig('./range_test_result.png')
             plt.clf()
+            print('[INFO] Previous learning rate : %f :: Updated learning rate : %f' % (old_lr, lr), flush=True)
 
 
 class DecayMarginCallback(tf.keras.callbacks.Callback):
