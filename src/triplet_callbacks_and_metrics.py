@@ -213,7 +213,7 @@ class RangeTestCallback(tf.keras.callbacks.Callback):
             plt.ylabel('Loss')
             plt.savefig('./range_test_result.png')
             plt.clf()
-            print('[INFO] Previous learning rate : %f :: Updated learning rate : %f' % (old_lr, lr), flush=True)
+            print('\t[INFO] Previous learning rate : %f :: Updated learning rate : %f' % (old_lr, lr), flush=True)
 
 
 class DecayMarginCallback(tf.keras.callbacks.Callback):
