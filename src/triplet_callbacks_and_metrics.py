@@ -204,7 +204,7 @@ class RangeTestCallback(tf.keras.callbacks.Callback):
         lr += self.by
         tf.keras.backend.set_value(self.model.optimizer.lr, lr)
         self.batches_so_far += 1
-        if self.batches_so_far % 200 == 0 and self.batches_so_far > 0:
+        if self.batches_so_far % 10 == 0 and self.batches_so_far > 0:
             plt.xscale('log')
             plt.plot(self.lrs, self.losses, color='blue')
             smooth_losses = savgol_filter(self.losses, 7, 3)
