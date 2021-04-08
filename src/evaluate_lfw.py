@@ -6,6 +6,7 @@ import os
 import sys
 import math
 import argparse
+import importlib
 import numpy as np
 from scipy import misc
 import tensorflow as tf
