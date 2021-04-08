@@ -62,22 +62,30 @@ def _read_pairs(pairs_filename):
     return np.array(pairs)
 
 def _get_preprocessor(model_type):
-    if model_type[0:6] == 'resnet':
-        preprocessor = 'tensorflow.keras.applications.resnet'
-    elif model_type[0:13] == 'efficientnet':
-        preprocessor = 'tensorflow.keras.applications.efficientnet'
-    elif model_type == 'xception':
-        preprocessor = 'tensorflow.keras.applications.xception'
-    elif model_type == 'inception_v3':
-        preprocessor = 'tensorflow.keras.applications.inception_v3'
-    elif model_type == 'inception_resnet_v2':
+    if 'inception_resnet_v2' in model_type:
         preprocessor = 'tensorflow.keras.applications.inception_resnet_v2'
-    elif model_type == 'mobilenet':
-        preprocessor = 'tensorflow.keras.applications.mobilenet'
-    elif model_type == 'mobilenet_v2':
+        print('[INFO] Loaded Inception-Resnet-V2 data preprocessor', flush=True)
+    elif 'efficientnet' in model_type:
+        preprocessor = 'tensorflow.keras.applications.efficientnet'
+        print('[INFO] Loaded EfficientNet data preprocessor', flush=True)
+    elif 'xception' in model_type:
+        preprocessor = 'tensorflow.keras.applications.xception'
+        print('[INFO] Loaded Xception data preprocessor', flush=True)
+    elif 'inception_v3' in model_type:
+        preprocessor = 'tensorflow.keras.applications.inception_v3'
+        print('[INFO] Loaded Inception-V3 data preprocessor', flush=True)
+    elif 'resnet' in model_type:
+        preprocessor = 'tensorflow.keras.applications.resnet'
+        print('[INFO] Loaded Resnet data preprocessor', flush=True)
+    elif 'mobilenet_v2' in model_type:
         preprocessor = 'tensorflow.keras.applications.mobilenet_v2'
+        print('[INFO] Loaded MobileNet-V2 data preprocessor', flush=True)
+    elif 'mobilenet' in model_type:
+        preprocessor = 'tensorflow.keras.applications.mobilenet'
+        print('[INFO] Loaded MobileNet data preprocessor', flush=True)
     else:
         preprocessor = None
+        print('[WARNING] Could not find appropriate pre-processor for model', flush=True)
 
     if preprocessor is not None:
         preprocessor = importlib.import_module(preprocessor)
