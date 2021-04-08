@@ -135,21 +135,20 @@ def generate_training_dataset(data_path, image_size, batch_size, crop_size, cach
             img = img / 255.
         img = tf.image.random_crop(img, [crop_size, crop_size, 3])
         img = tf.image.random_flip_left_right(img)
-        img = tf.image.random_brightness(img, 0.3)
+        #img = tf.image.random_brightness(img, 0.3)
         #img = tf.image.random_contrast(img, 0.6, 1.0)
         #img = tf.image.random_jpeg_quality(img, 70, 100)
         return img, label
 
     ds = tf.data.Dataset.list_files(str(data_path/"*/*.png"), shuffle=False)
-    ds = ds.batch(images_per_person)
+    '''ds = ds.batch(images_per_person)
     if len(cache) > 1:
         ds = ds.cache(cache)
     ds = ds.shuffle(batches+1, reshuffle_each_iteration=True)
-    ds = ds.unbatch()
-    #ds = ds.batch(batch_size).map(lambda x: tf.random.shuffle(x), num_parallel_calls=AUTOTUNE).unbatch()
+    ds = ds.unbatch()'''
+    ds = ds.shuffle(1024)
     ds = ds.map(process_path, num_parallel_calls=AUTOTUNE, deterministic=True)
     ds = ds.batch(batch_size)
-    #ds = ds.repeat() # Is this needed?
     ds = ds.prefetch(AUTOTUNE)
 
     return ds, image_count, len(CLASS_NAMES)
