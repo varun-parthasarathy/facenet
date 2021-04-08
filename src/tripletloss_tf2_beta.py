@@ -185,7 +185,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                 people_per_sample=12, distance_metric="L2", soft=True, 
                 sigma=0.3, decay_margin_rate=0.0, use_lfw=True, target_margin=0.2, distributed=False,
                 eager_execution=False, weights_path='', checkpoint_interval=5000, use_metrics=False,
-                step_size=6000, recompile=False):
+                step_size=6000, recompile=False, steps_per_epoch=None):
 
     if use_tpu is True:
         assert tpu_name is not None, '[ERROR] TPU name must be specified'
@@ -432,7 +432,8 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
         train_history = model.fit(train_dataset, 
                                   epochs=num_epochs, 
                                   callbacks=callback_list, 
-                                  validation_data=test_dataset)
+                                  validation_data=test_dataset,
+                                  steps_per_epoch=None if steps_per_epoch == 0 else steps_per_epoch)
         
         if not os.path.exists('./results'):
             os.mkdir('./results')
@@ -525,6 +526,8 @@ if __name__ == '__main__':
                         help='Step size for cyclic learning rate policies')
     parser.add_argument('--recompile', action='store_true',
                         help='Recompile model. Recommended for constant learning rate')
+    parser.add_argument('--steps_per_epoch', type=int, default=0, required=False,
+                        help='Number of steps before an epoch is completed. Default is 0')
 
     args = vars(parser.parse_args())
 
@@ -563,4 +566,5 @@ if __name__ == '__main__':
                 checkpoint_interval=args['checkpoint_interval'],
                 use_metrics=args['use_metrics'],
                 step_size=args['step_size'],
-                recompile=args['recompile'])
+                recompile=args['recompile'],
+                steps_per_epoch=args['steps_per_epoch'])

@@ -147,13 +147,13 @@ class TripletLossMetrics(tf.keras.metrics.Metric):
             auc = metrics.auc(fpr, tpr)
             eer = brentq(lambda x: 1. - x - interpolate.interp1d(fpr, tpr)(x), 0., 1.)
             acc = np.mean(accuracy)
-            result_string.format(acc, acc_std, val, val_std, far, auc, eer)
+            result_string = result_string.format(acc, acc_std, val, val_std, far, auc, eer)
             #DEBUG
             print(result_string, flush=True)
             #DEBUG ENDS
-            return tf.convert_to_tensor(result_string, dtype=str)
+            return acc
         else:
-            return 0
+            return 0.0
 
     def reset_states(self):
         self.labels = np.zeros((nrof_images,))
