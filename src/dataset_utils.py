@@ -100,7 +100,6 @@ def generate_training_dataset(data_path, image_size, batch_size, crop_size, cach
     print("[INFO] Image count in training dataset : %d" % (image_count))
     preprocessor = _get_preprocessor(model_type)
 
-    #classes_ds = tf.data.Dataset.list_files(str(data_path/'*/'))
 
     def get_label(file_path):
         parts = tf.strings.split(file_path, os.path.sep)
@@ -140,15 +139,21 @@ def generate_training_dataset(data_path, image_size, batch_size, crop_size, cach
         #img = tf.image.random_jpeg_quality(img, 70, 100)
         return img, label
 
-    ds = tf.data.Dataset.list_files(str(data_path/"*/*.png"), shuffle=False)
+    def get_images(f):
+        return tf.data.Dataset.list_files(tf.strings.join([f, '/*.png']))
+
+    #ds = tf.data.Dataset.list_files(str(data_path/"*/*.png"), shuffle=False)
     '''ds = ds.batch(images_per_person)
     if len(cache) > 1:
         ds = ds.cache(cache)
     ds = ds.shuffle(batches+1, reshuffle_each_iteration=True)
     ds = ds.unbatch()'''
-    ds = ds.shuffle(1024)
+    classes_ds = tf.data.Dataset.list_files(str(data_path/'*/'), shuffle=True)
+    ds = classes_ds.interleave(lambda f: get_images(f), block_length=images_per_person,
+                               cycle_length=people_per_sample, num_parallel_calls=AUTOTUNE)
+    #ds = ds.shuffle(1024)
     ds = ds.map(process_path, num_parallel_calls=AUTOTUNE, deterministic=True)
-    ds = ds.batch(batch_size)
+    ds = ds.batch(batch_size).shuffle(2048)
     ds = ds.prefetch(AUTOTUNE)
 
     return ds, image_count, len(CLASS_NAMES)
