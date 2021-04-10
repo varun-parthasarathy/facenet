@@ -185,7 +185,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                 people_per_sample=12, distance_metric="L2", soft=True, 
                 sigma=0.3, decay_margin_rate=0.0, use_lfw=True, target_margin=0.2, distributed=False,
                 eager_execution=False, weights_path='', checkpoint_interval=5000, use_metrics=False,
-                step_size=6000, recompile=False, steps_per_epoch=None):
+                step_size=6000, recompile=False, steps_per_epoch=None, equisample=False):
 
     if use_tpu is True:
         assert tpu_name is not None, '[ERROR] TPU name must be specified'
@@ -216,7 +216,8 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                                                  images_per_person=images_per_person,
                                                                  people_per_sample=people_per_sample,
                                                                  use_tpu=use_tpu,
-                                                                 model_type=model_type)
+                                                                 model_type=model_type,
+                                                                 equisample=equisample)
 
     if test_path is not None and len(test_path) > 1:
         if use_lfw is True:
@@ -528,6 +529,8 @@ if __name__ == '__main__':
                         help='Recompile model. Recommended for constant learning rate')
     parser.add_argument('--steps_per_epoch', type=int, default=0, required=False,
                         help='Number of steps before an epoch is completed. Default is 0')
+    parser.add_argument('--equisample', action='store_true',
+                        help='Determines whether to sample images from each class equally to form a batch. Will have performance drawbacks if enabled')
 
     args = vars(parser.parse_args())
 
@@ -567,4 +570,5 @@ if __name__ == '__main__':
                 use_metrics=args['use_metrics'],
                 step_size=args['step_size'],
                 recompile=args['recompile'],
-                steps_per_epoch=args['steps_per_epoch'])
+                steps_per_epoch=args['steps_per_epoch'],
+                equisample=args['equisample'])

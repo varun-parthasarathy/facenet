@@ -89,7 +89,7 @@ def _get_preprocessor(model_type):
 
 def generate_training_dataset(data_path, image_size, batch_size, crop_size, cache='',
                               use_mixed_precision=False, images_per_person=35, people_per_sample=50, 
-                              use_tpu=False, model_type=None):
+                              use_tpu=False, model_type=None, equisample=False):
     data_path = pathlib.Path(data_path)
     AUTOTUNE = tf.data.experimental.AUTOTUNE
     CLASS_NAMES = [item.name for item in data_path.iterdir() if item.is_dir()]
@@ -142,19 +142,27 @@ def generate_training_dataset(data_path, image_size, batch_size, crop_size, cach
     def get_images(f):
         return tf.data.Dataset.list_files(tf.strings.join([f, '/*.png']))
 
-    #ds = tf.data.Dataset.list_files(str(data_path/"*/*.png"), shuffle=False)
     '''ds = ds.batch(images_per_person)
     if len(cache) > 1:
         ds = ds.cache(cache)
     ds = ds.shuffle(batches+1, reshuffle_each_iteration=True)
     ds = ds.unbatch()'''
-    classes_ds = tf.data.Dataset.list_files(str(data_path/'*/'), shuffle=True)
-    ds = classes_ds.interleave(lambda f: get_images(f), block_length=images_per_person,
-                               cycle_length=people_per_sample, num_parallel_calls=AUTOTUNE)
-    #ds = ds.shuffle(1024)
-    ds = ds.map(process_path, num_parallel_calls=AUTOTUNE, deterministic=True)
-    ds = ds.batch(batch_size).shuffle(2048)
-    ds = ds.prefetch(AUTOTUNE)
+    ds = None
+    if equisample is True:
+        classes_ds = tf.data.Dataset.list_files(str(data_path/'*/'), shuffle=True)
+        ds = classes_ds.interleave(lambda f: get_images(f), block_length=images_per_person,
+                                   cycle_length=people_per_sample, num_parallel_calls=AUTOTUNE)
+        #if len(cache) > 1:
+        #    ds = ds.cache(cache)
+        ds = ds.map(process_path, num_parallel_calls=AUTOTUNE, deterministic=True)
+        ds = ds.batch(batch_size).shuffle(2048)
+        ds = ds.prefetch(AUTOTUNE)
+    else:
+        ds = tf.data.Dataset.list_files(str(data_path/"*/*.png"), shuffle=False)
+        ds = ds.shuffle(1024)
+        ds = ds.map(process_path, num_parallel_calls=AUTOTUNE, deterministic=True)
+        ds = ds.batch(batch_size)
+        ds = ds.prefetch(AUTOTUNE)
 
     return ds, image_count, len(CLASS_NAMES)
 
