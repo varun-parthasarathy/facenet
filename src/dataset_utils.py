@@ -155,13 +155,13 @@ def generate_training_dataset(data_path, image_size, batch_size, crop_size, cach
         #if len(cache) > 1:
         #    ds = ds.cache(cache)
         ds = ds.map(process_path, num_parallel_calls=AUTOTUNE, deterministic=True)
-        ds = ds.batch(batch_size).shuffle(2048)
+        ds = ds.batch(batch_size).shuffle(4096, reshuffle_each_iteration=True)
         ds = ds.prefetch(AUTOTUNE)
     else:
         ds = tf.data.Dataset.list_files(str(data_path/"*/*.png"), shuffle=False)
         ds = ds.shuffle(1024)
         ds = ds.map(process_path, num_parallel_calls=AUTOTUNE, deterministic=True)
-        ds = ds.batch(batch_size)
+        ds = ds.batch(batch_size).shuffle(4096, reshuffle_each_iteration=True)
         ds = ds.prefetch(AUTOTUNE)
 
     return ds, image_count, len(CLASS_NAMES)
