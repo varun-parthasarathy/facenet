@@ -317,7 +317,7 @@ def main(weights_path, lfw_path, image_size, crop_size, model_type, loss_type,
     val, val_std, far = _calculate_val(thresholds, embeddings1, embeddings2,
                                        actual_issame, 1e-3, nrof_folds=10, distance_metric=0)
     auc = metrics.auc(fpr, tpr)
-    eer = brentq(lambda x: 1. - x - interpolate.interp1d(fpr, tpr)(x), 0., 1.)
+    eer = brentq(lambda x: 1. - x - interpolate.interp1d(fpr, tpr, fill_value='extrapolate')(x), 0., 1.)
     acc = np.mean(accuracy)
 
     result_string = result_string.format(acc*100, acc_std*100, val*100, val_std*100, far, auc, eer)
