@@ -96,7 +96,7 @@ def generate_training_dataset(data_path, image_size, batch_size, crop_size, cach
     CLASS_NAMES.sort()
     CLASS_NAMES = np.array(CLASS_NAMES)
     image_count = len(list(data_path.glob('*/*.png')))
-    batches = int(image_count / images_per_person)
+    #batches = int(image_count / images_per_person)
     print("[INFO] Image count in training dataset : %d" % (image_count))
     preprocessor = _get_preprocessor(model_type)
 
@@ -142,9 +142,6 @@ def generate_training_dataset(data_path, image_size, batch_size, crop_size, cach
     def get_images(f):
         return tf.data.Dataset.list_files(tf.strings.join([f, '/*.png']))
 
-    def filter_fn(x):
-        return tf.io.gfile.isdir(tf.strings.as_string(x))
-
     '''ds = ds.batch(images_per_person)
     if len(cache) > 1:
         ds = ds.cache(cache)
@@ -152,8 +149,10 @@ def generate_training_dataset(data_path, image_size, batch_size, crop_size, cach
     ds = ds.unbatch()'''
     ds = None
     if equisample is True:
-        classes_ds = tf.data.Dataset.list_files(str(data_path/'*/'), shuffle=True)
-        classes_ds = classes_ds.filter(filter_fn)
+        classes_in_path = [str(i) for i in data_path.iterdir() if i.is_dir()]
+        #classes_ds = tf.data.Dataset.list_files(str(data_path/'*/'), shuffle=True)
+        classes_ds = tf.data.Dataset.from_tensor_slices(classes_in_path)
+        classes_ds = classes_ds.shuffle(len(classes_in_path), reshuffle_each_iteration=True)
         ds = classes_ds.interleave(lambda f: get_images(f), block_length=images_per_person,
                                    cycle_length=people_per_sample, num_parallel_calls=AUTOTUNE)
         #if len(cache) > 1:
