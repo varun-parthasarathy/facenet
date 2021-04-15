@@ -162,7 +162,7 @@ def generate_training_dataset(data_path, image_size, batch_size, crop_size, cach
         ds = ds.prefetch(AUTOTUNE)
     else:
         ds = tf.data.Dataset.list_files(str(data_path/"*/*.png"), shuffle=False)
-        ds = ds.shuffle(1024)
+        ds = ds.shuffle(images_per_person * people_per_sample)
         ds = ds.map(process_path, num_parallel_calls=AUTOTUNE, deterministic=True)
         ds = ds.batch(batch_size).shuffle(512, reshuffle_each_iteration=True)
         ds = ds.prefetch(AUTOTUNE)
