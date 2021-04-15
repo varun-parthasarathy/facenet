@@ -143,7 +143,7 @@ def generate_training_dataset(data_path, image_size, batch_size, crop_size, cach
         return tf.data.Dataset.list_files(tf.strings.join([f, '/*.png']))
 
     def filter_fn(x):
-        return tf.io.gfile.isdir(x)
+        return tf.io.gfile.isdir(tf.strings.as_string(x))
 
     '''ds = ds.batch(images_per_person)
     if len(cache) > 1:
@@ -165,7 +165,7 @@ def generate_training_dataset(data_path, image_size, batch_size, crop_size, cach
         ds = tf.data.Dataset.list_files(str(data_path/"*/*.png"), shuffle=False)
         ds = ds.shuffle(1024)
         ds = ds.map(process_path, num_parallel_calls=AUTOTUNE, deterministic=True)
-        ds = ds.batch(batch_size).shuffle(128, reshuffle_each_iteration=True)
+        ds = ds.batch(batch_size).shuffle(512, reshuffle_each_iteration=True)
         ds = ds.prefetch(AUTOTUNE)
 
     return ds, image_count, len(CLASS_NAMES)
