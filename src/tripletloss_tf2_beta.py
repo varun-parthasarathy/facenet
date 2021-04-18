@@ -80,29 +80,34 @@ def create_neural_network(model_type='resnet50', embedding_size=512, input_shape
         print('[INFO] Attempting to load weights from most recently saved checkpoint')
         loss_obj = None
         try:
-            if loss_type == 'ADAPTIVE':
-                loss_obj = ['AdaptiveTripletLoss', loss_fn]
-            elif loss_type == 'FOCAL':
-                loss_obj = ['TripletFocalLoss', loss_fn]
-            elif loss_type == 'BATCH_HARD':
-                loss_obj = ['TripletBatchHardLoss', loss_fn]
-            elif loss_type == 'BATCH_HARD_V2':
-                loss_obj = ['TripletBatchHardV2Loss', loss_fn]
-            elif loss_type == 'ASSORTED':
-                loss_obj = ['AssortedTripletLoss', loss_fn]
-            else:
-                loss_obj = None
-            if loss_obj is not None and recompile is False:
-                model = tf.keras.models.load_model(weights_path, custom_objects={loss_obj[0]:loss_obj[1]})
-            else:
+            if recompile is True:
                 model = tf.keras.models.load_model(weights_path)
                 print('[INFO] Loading model without custom objects')
-            if recompile is None or recompile is False:
-                compiled = True
-                print('[WARNING] Model is already compiled; ignoring passed optimizer, loss and learning rate parameters')
-            else:
-                compiled = False
                 print('[WARNING] Model will be compiled again. If you wish to start from a previously saved optimizer state, this is not recommended')
+            else:
+                if loss_type == 'ADAPTIVE':
+                    loss_obj = ['AdaptiveTripletLoss', loss_fn]
+                elif loss_type == 'FOCAL':
+                    loss_obj = ['TripletFocalLoss', loss_fn]
+                elif loss_type == 'BATCH_HARD':
+                    loss_obj = ['TripletBatchHardLoss', loss_fn]
+                elif loss_type == 'BATCH_HARD_V2':
+                    loss_obj = ['TripletBatchHardV2Loss', loss_fn]
+                elif loss_type == 'ASSORTED':
+                    loss_obj = ['AssortedTripletLoss', loss_fn]
+                else:
+                    loss_obj = None
+                if loss_obj is not None:
+                    model = tf.keras.models.load_model(weights_path, custom_objects={loss_obj[0]:loss_obj[1]})
+                else:
+                    model = tf.keras.models.load_model(weights_path)
+                    print('[INFO] Loading model without custom objects')
+                if recompile is None or recompile is False:
+                    compiled = True
+                    print('[WARNING] Model is already compiled; ignoring passed optimizer, loss and learning rate parameters')
+                else:
+                    compiled = False
+                    print('[WARNING] Model will be compiled again. If you wish to start from a previously saved optimizer state, this is not recommended')
             print('[INFO] Loading model from SavedModel format')
         except:
             try:
