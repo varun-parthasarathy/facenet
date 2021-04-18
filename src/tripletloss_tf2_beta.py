@@ -92,10 +92,11 @@ def create_neural_network(model_type='resnet50', embedding_size=512, input_shape
                 loss_obj = ['AssortedTripletLoss', loss_fn]
             else:
                 loss_obj = None
-            if loss_obj is not None:
+            if loss_obj is not None and recompile is False:
                 model = tf.keras.models.load_model(weights_path, custom_objects={loss_obj[0]:loss_obj[1]})
             else:
                 model = tf.keras.models.load_model(weights_path)
+                print('[INFO] Loading model without custom objects')
             if recompile is None or recompile is False:
                 compiled = True
                 print('[WARNING] Model is already compiled; ignoring passed optimizer, loss and learning rate parameters')
