@@ -81,7 +81,7 @@ def create_neural_network(model_type='resnet50', embedding_size=512, input_shape
         loss_obj = None
         try:
             if recompile is True:
-                model = tf.keras.models.load_model(weights_path)
+                model.load_weights(weights_path)
                 print('[INFO] Loading model without custom objects')
                 print('[WARNING] Model will be compiled again. If you wish to start from a previously saved optimizer state, this is not recommended')
             else:
