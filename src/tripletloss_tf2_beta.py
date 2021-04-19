@@ -81,8 +81,23 @@ def create_neural_network(model_type='resnet50', embedding_size=512, input_shape
         loss_obj = None
         try:
             if recompile is True:
-                model.load_weights(weights_path)
-                print('[INFO] Loading model without custom objects')
+                if loss_type == 'ADAPTIVE':
+                    loss_obj = ['AdaptiveTripletLoss', AdaptiveTripletLoss]
+                elif loss_type == 'FOCAL':
+                    loss_obj = ['TripletFocalLoss', TripletFocalLoss]
+                elif loss_type == 'BATCH_HARD':
+                    loss_obj = ['TripletBatchHardLoss', TripletBatchHardLoss]
+                elif loss_type == 'BATCH_HARD_V2':
+                    loss_obj = ['TripletBatchHardV2Loss', TripletBatchHardV2Loss]
+                elif loss_type == 'ASSORTED':
+                    loss_obj = ['AssortedTripletLoss', AssortedTripletLoss]
+                else:
+                    loss_obj = None
+                if loss_obj is not None:
+                    model = tf.keras.models.load_model(weights_path, custom_objects={loss_obj[0]:loss_obj[1]})
+                else:
+                    model = tf.keras.models.load_model(weights_path)
+                compiled = False
                 print('[WARNING] Model will be compiled again. If you wish to start from a previously saved optimizer state, this is not recommended')
             else:
                 if loss_type == 'ADAPTIVE':
@@ -102,12 +117,8 @@ def create_neural_network(model_type='resnet50', embedding_size=512, input_shape
                 else:
                     model = tf.keras.models.load_model(weights_path)
                     print('[INFO] Loading model without custom objects')
-                if recompile is None or recompile is False:
-                    compiled = True
-                    print('[WARNING] Model is already compiled; ignoring passed optimizer, loss and learning rate parameters')
-                else:
-                    compiled = False
-                    print('[WARNING] Model will be compiled again. If you wish to start from a previously saved optimizer state, this is not recommended')
+                compiled = True
+                print('[WARNING] Model is already compiled; ignoring passed optimizer, loss and learning rate parameters')
             print('[INFO] Loading model from SavedModel format')
         except:
             try:
@@ -191,7 +202,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                 people_per_sample=12, distance_metric="L2", soft=True, 
                 sigma=0.3, decay_margin_rate=0.0, use_lfw=True, target_margin=0.2, distributed=False,
                 eager_execution=False, weights_path='', checkpoint_interval=5000, use_metrics=False,
-                step_size=6000, recompile=False, steps_per_epoch=None, equisample=False):
+                step_size=6000, recompile=False, steps_per_epoch=None, equisample=False, loss_to_load=''):
 
     if use_tpu is True:
         assert tpu_name is not None, '[ERROR] TPU name must be specified'
@@ -311,7 +322,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                 model, compiled = create_neural_network(model_type=model_type,
                                                         embedding_size=embedding_size,
                                                         weights_path=weights_path,
-                                                        loss_type=triplet_strategy,
+                                                        loss_type=loss_to_load,
                                                         loss_fn=loss_fn,
                                                         recompile=recompile)
                 assert model is not None, '[ERROR] There was a problem while loading the pre-trained weights'
@@ -325,7 +336,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                 model, compiled = create_neural_network(model_type=model_type,
                                                         embedding_size=embedding_size,
                                                         weights_path=weights_path,
-                                                        loss_type=triplet_strategy,
+                                                        loss_type=loss_to_load,
                                                         loss_fn=loss_fn,
                                                         recompile=recompile)
                 opt = get_optimizer(optimizer_name=optimizer,
@@ -341,7 +352,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
             model, compiled = create_neural_network(model_type=model_type,
                                                     embedding_size=embedding_size,
                                                     weights_path=weights_path,
-                                                    loss_type=triplet_strategy,
+                                                    loss_type=loss_to_load,
                                                     loss_fn=loss_fn,
                                                     recompile=recompile)
             assert model is not None, '[ERROR] There was a problem while loading the pre-trained weights'
@@ -390,7 +401,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                 model, compiled = create_neural_network(model_type=model_type,
                                                         embedding_size=embedding_size,
                                                         weights_path=weights_path,
-                                                        loss_type=triplet_strategy,
+                                                        loss_type=loss_to_load,
                                                         loss_fn=loss_fn,
                                                         recompile=recompile)
                 assert model is not None, '[ERROR] There was a problem in loading the pre-trained weights'
@@ -404,7 +415,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                 model, compiled = create_neural_network(model_type=model_type,
                                                         embedding_size=embedding_size,
                                                         weights_path=weights_path,
-                                                        loss_type=triplet_strategy,
+                                                        loss_type=loss_to_load,
                                                         loss_fn=loss_fn,
                                                         recompile=recompile)
                 opt = get_optimizer(optimizer_name=optimizer,
@@ -420,7 +431,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
             model, compiled = create_neural_network(model_type=model_type,
                                                     embedding_size=embedding_size,
                                                     weights_path=weights_path,
-                                                    loss_type=triplet_strategy,
+                                                    loss_type=loss_to_load,
                                                     loss_fn=loss_fn,
                                                     recompile=recompile)
             assert model is not None, '[ERROR] There was a problem in loading the pre-trained weights'
@@ -537,6 +548,9 @@ if __name__ == '__main__':
                         help='Number of steps before an epoch is completed. Default is 0')
     parser.add_argument('--equisample', action='store_true',
                         help='Determines whether to sample images from each class equally to form a batch. Will have performance drawbacks if enabled')
+    parser.add_argument('--loss_to_load', type=str, default='FOCAL',
+                        choices=['VANILLA', 'BATCH_HARD', 'BATCH_HARD_V2', 'FOCAL', 'ADAPTIVE', 'ASSORTED'],
+                        help='Choice of triplet loss object for loading models. Default is FOCAL')
 
     args = vars(parser.parse_args())
 
@@ -577,4 +591,5 @@ if __name__ == '__main__':
                 step_size=args['step_size'],
                 recompile=args['recompile'],
                 steps_per_epoch=args['steps_per_epoch'],
-                equisample=args['equisample'])
+                equisample=args['equisample'],
+                loss_to_load=args['loss_to_load'])
