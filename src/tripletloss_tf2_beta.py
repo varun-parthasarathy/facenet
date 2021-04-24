@@ -128,7 +128,7 @@ def create_neural_network(model_type='resnet50', embedding_size=512, input_shape
             except:
                 print('[ERROR] Weights did not match the model architecture specified, or path was incorrect')
                 print('[WARNING] Could not load weights. Using random initialization instead')
-                return model, compiled
+                return model, False
     else:
         print('[WARNING] Could not load weights. Using random initialization instead')
 
@@ -327,6 +327,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                                         recompile=recompile)
                 assert model is not None, '[ERROR] There was a problem while loading the pre-trained weights'
                 if compiled is False:
+                    print('[INFO] Recompiling model using passed optimizer and loss arguments')
                     model.compile(optimizer=opt,
                                   loss=loss_fn,
                                   metrics=[triplet_loss_metrics] if use_metrics is True else None,
@@ -344,6 +345,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                     weight_decay=weight_decay) # Optimizer must be created within scope!
                 assert model is not None, '[ERROR] There was a problem while loading the pre-trained weights'
                 if compiled is False:
+                    print('[INFO] Recompiling model using passed optimizer and loss arguments')
                     model.compile(optimizer=opt,
                                   loss=loss_fn,
                                   metrics=[triplet_loss_metrics] if use_metrics is True else None,
@@ -357,6 +359,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                                     recompile=recompile)
             assert model is not None, '[ERROR] There was a problem while loading the pre-trained weights'
             if compiled is False:
+                print('[INFO] Recompiling model using passed optimizer and loss arguments')
                 model.compile(optimizer=opt,
                               loss=loss_fn,
                               metrics=[triplet_loss_metrics] if use_metrics is True else None,
@@ -406,6 +409,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                                         recompile=recompile)
                 assert model is not None, '[ERROR] There was a problem in loading the pre-trained weights'
                 if compiled is False:
+                    print('[INFO] Recompiling model using passed optimizer and loss arguments')
                     model.compile(optimizer=opt,
                                   loss=loss_fn,
                                   metrics=[triplet_loss_metrics] if use_metrics is True else None,
@@ -423,6 +427,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                     weight_decay=weight_decay) # Optimizer must be created within scope!
                 assert model is not None, '[ERROR] There was a problem in loading the pre-trained weights'
                 if compiled is False:
+                    print('[INFO] Recompiling model using passed optimizer and loss arguments')
                     model.compile(optimizer=opt,
                                   loss=loss_fn,
                                   metrics=[triplet_loss_metrics] if use_metrics is True else None,
@@ -436,6 +441,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                                     recompile=recompile)
             assert model is not None, '[ERROR] There was a problem in loading the pre-trained weights'
             if compiled is False:
+                print('[INFO] Recompiling model using passed optimizer and loss arguments')
                 model.compile(optimizer=opt,
                               loss=loss_fn,
                               metrics=[triplet_loss_metrics] if use_metrics is True else None,
