@@ -193,15 +193,25 @@ def get_optimizer(optimizer_name, lr_schedule, weight_decay=1e-6):
                                         weight_decay=weight_decay,
                                         amsgrad=False)
         opt = tfa.optimizers.Lookahead(optimizer=base_opt,
-                                       sync_period=6,
+                                       sync_period=8,
                                        slow_step_size=0.5)
     elif optimizer_name == 'LOOKAHEAD_SGD':
         base_opt = tfa.optimizers.SGDW(learning_rate=lr_schedule,
-                                  weight_decay=weight_decay,
-                                  momentum=0.9,
-                                  nesterov=True)
+                                       weight_decay=weight_decay,
+                                       momentum=0.9,
+                                       nesterov=True)
         opt = tfa.optimizers.Lookahead(optimizer=base_opt,
-                                       sync_period=6,
+                                       sync_period=8,
+                                       slow_step_size=0.5)
+    elif optimizer_name == 'RANGER':
+        base_opt = tfa.optimizers.RectifiedAdam(learning_rate=lr_schedule,
+                                                weight_decay=weight_decay,
+                                                total_steps=5000,
+                                                warmup_proportion=0.1,
+                                                min_lr=lr_schedule/100. if isinstance(lr_schedule, float) else 1e-4,
+                                                amsgrad=False)
+        opt = tfa.optimizers.Lookahead(optimizer=base_opt,
+                                       sync_period=8,
                                        slow_step_size=0.5)
     else:
         pass
@@ -503,7 +513,8 @@ if __name__ == '__main__':
     parser.add_argument('--weight_decay', required=False, type=float, default=0.000001,
                         help='Weight decay coefficient for regularization. Default value is 1e-6')
     parser.add_argument('--optimizer', required=False, default='RMSPROP',
-                        choices=['RMSPROP', 'SGDW', 'ADAM', 'ADAGRAD', 'ADADELTA', 'LOOKAHEAD_SGD', 'LOOKAHEAD_ADAM'],
+                        choices=['RMSPROP', 'SGDW', 'ADAM', 'ADAGRAD', 'ADADELTA', 'LOOKAHEAD_SGD', 
+                                 'LOOKAHEAD_ADAM', 'RANGER'],
                         help='Optimizer to use for training. Default is RMSprop')
     parser.add_argument('--model', required=False, type=str, default='inception_v3',
                         choices=['resnet50', 'resnet101', 'resnet152', 'inception_v3', 'efficientnet_b0',
