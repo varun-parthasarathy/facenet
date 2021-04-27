@@ -36,21 +36,29 @@ def create_neural_network(model_type='resnet50', embedding_size=512, input_shape
     elif model_type == 'inception_v3':
         base_model = InceptionV3(weights=None, classes=embedding_size, classifier_activation=None)
     elif model_type == 'efficientnet_b0':
-        base_model = EfficientNetB0(weights=None, classes=embedding_size, classifier_activation=None)
+        base_model = EfficientNetB0(weights=None, classes=embedding_size, classifier_activation=None, 
+                                    activation=tfa.activations.mish)
     elif model_type == 'efficientnet_b1':
-        base_model = EfficientNetB1(weights=None, classes=embedding_size, classifier_activation=None)
+        base_model = EfficientNetB1(weights=None, classes=embedding_size, classifier_activation=None, 
+                                    activation=tfa.activations.mish)
     elif model_type == 'efficientnet_b2':
-        base_model = EfficientNetB2(weights=None, classes=embedding_size, classifier_activation=None)
+        base_model = EfficientNetB2(weights=None, classes=embedding_size, classifier_activation=None, 
+                                    activation=tfa.activations.mish)
     elif model_type == 'efficientnet_b3':
-        base_model = EfficientNetB3(weights=None, classes=embedding_size, classifier_activation=None)
+        base_model = EfficientNetB3(weights=None, classes=embedding_size, classifier_activation=None, 
+                                    activation=tfa.activations.mish)
     elif model_type == 'efficientnet_b4':
-        base_model = EfficientNetB4(weights=None, classes=embedding_size, classifier_activation=None)
+        base_model = EfficientNetB4(weights=None, classes=embedding_size, classifier_activation=None, 
+                                    activation=tfa.activations.mish)
     elif model_type == 'efficientnet_b5':
-        base_model = EfficientNetB5(weights=None, classes=embedding_size, classifier_activation=None)
+        base_model = EfficientNetB5(weights=None, classes=embedding_size, classifier_activation=None, 
+                                    activation=tfa.activations.mish)
     elif model_type == 'efficientnet_b6':
-        base_model = EfficientNetB6(weights=None, classes=embedding_size, classifier_activation=None)
+        base_model = EfficientNetB6(weights=None, classes=embedding_size, classifier_activation=None, 
+                                    activation=tfa.activations.mish)
     elif model_type == 'efficientnet_b7':
-        base_model = EfficientNetB7(weights=None, classes=embedding_size, classifier_activation=None)
+        base_model = EfficientNetB7(weights=None, classes=embedding_size, classifier_activation=None, 
+                                    activation=tfa.activations.mish)
     elif model_type == 'inception_resnet_v2':
         base_model = InceptionResNetV2(weights=None, classes=embedding_size, classifier_activation=None)
     elif model_type == 'xception':
