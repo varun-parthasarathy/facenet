@@ -183,11 +183,26 @@ def get_optimizer(optimizer_name, lr_schedule, weight_decay=1e-6):
     elif optimizer_name == 'ADAM':
         opt = tfa.optimizers.AdamW(learning_rate=lr_schedule,
                                    weight_decay=weight_decay,
-                                   amsgrad=True)                    # Needs to be tested further
+                                   amsgrad=False)                    # Needs to be tested further
     elif optimizer_name == 'ADAGRAD':
         opt = tf.keras.optimizers.Adagrad(learning_rate=lr_schedule)
     elif optimizer_name == 'ADADELTA':
         opt = tf.keras.optimizers.Adadelta(learning_rate=lr_schedule)
+    elif optimizer_name == 'LOOKAHEAD_ADAM':
+        base_opt = tfa.optimizers.AdamW(learning_rate=lr_schedule,
+                                        weight_decay=weight_decay,
+                                        amsgrad=False)
+        opt = tfa.optimizers.Lookahead(optimizer=base_opt,
+                                       sync_period=6,
+                                       slow_step_size=0.5)
+    elif optimizer_name == 'LOOKAHEAD_SGD':
+        base_opt = tfa.optimizers.SGDW(learning_rate=lr_schedule,
+                                  weight_decay=weight_decay,
+                                  momentum=0.9,
+                                  nesterov=True)
+        opt = tfa.optimizers.Lookahead(optimizer=base_opt,
+                                       sync_period=6,
+                                       slow_step_size=0.5)
     else:
         pass
 
@@ -488,7 +503,7 @@ if __name__ == '__main__':
     parser.add_argument('--weight_decay', required=False, type=float, default=0.000001,
                         help='Weight decay coefficient for regularization. Default value is 1e-6')
     parser.add_argument('--optimizer', required=False, default='RMSPROP',
-                        choices=['RMSPROP', 'SGDW', 'ADAM', 'ADAGRAD', 'ADADELTA'],
+                        choices=['RMSPROP', 'SGDW', 'ADAM', 'ADAGRAD', 'ADADELTA', 'LOOKAHEAD_SGD', 'LOOKAHEAD_ADAM'],
                         help='Optimizer to use for training. Default is RMSprop')
     parser.add_argument('--model', required=False, type=str, default='inception_v3',
                         choices=['resnet50', 'resnet101', 'resnet152', 'inception_v3', 'efficientnet_b0',
