@@ -191,7 +191,7 @@ def get_optimizer(optimizer_name, lr_schedule, weight_decay=1e-6):
     elif optimizer_name == 'ADAM':
         opt = tfa.optimizers.AdamW(learning_rate=lr_schedule,
                                    weight_decay=weight_decay,
-                                   amsgrad=False)                    # Needs to be tested further
+                                   amsgrad=True)                    # Needs to be tested further
     elif optimizer_name == 'ADAGRAD':
         opt = tf.keras.optimizers.Adagrad(learning_rate=lr_schedule)
     elif optimizer_name == 'ADADELTA':
@@ -199,7 +199,7 @@ def get_optimizer(optimizer_name, lr_schedule, weight_decay=1e-6):
     elif optimizer_name == 'LOOKAHEAD_ADAM':
         base_opt = tfa.optimizers.AdamW(learning_rate=lr_schedule,
                                         weight_decay=weight_decay,
-                                        amsgrad=False)
+                                        amsgrad=True)
         opt = tfa.optimizers.Lookahead(optimizer=base_opt,
                                        sync_period=8,
                                        slow_step_size=0.5)
