@@ -212,11 +212,16 @@ def get_optimizer(optimizer_name, lr_schedule, weight_decay=1e-6):
                                        sync_period=8,
                                        slow_step_size=0.5)
     elif optimizer_name == 'RANGER':
+        min_lr = None
+        if isinstance(lr_schedule, float):
+            min_lr = max(lr_schedule/100., 1e-4)
+        else:
+            min_lr = 1e-4
         base_opt = tfa.optimizers.RectifiedAdam(learning_rate=lr_schedule,
                                                 weight_decay=weight_decay,
                                                 total_steps=5000,
                                                 warmup_proportion=0.1,
-                                                min_lr=lr_schedule/100. if isinstance(lr_schedule, float) else 1e-4,
+                                                min_lr=min_lr,
                                                 amsgrad=False)
         opt = tfa.optimizers.Lookahead(optimizer=base_opt,
                                        sync_period=8,
