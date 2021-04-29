@@ -43,7 +43,7 @@ def OutputLayer(embd_shape, name='OutputLayer'):
     def output_layer(x_in):
         x = inputs = Input(x_in.shape[1:])
         x = tf.keras.layers.BatchNormalization()(x)
-        x = Dropout(rate=0.5)(x)
+        x = Dropout(0.5)(x)
         x = Flatten()(x)
         x = Dense(embd_shape)(x)
         x = BatchNormalization()(x)
@@ -128,7 +128,6 @@ def create_neural_network(model_type='resnet50', n_classes=2, embedding_size=512
 
     if len(weights_path) > 1 and os.path.exists(weights_path):
         print('[INFO] Attempting to load weights from most recently saved checkpoint')
-        loss_obj = None
         try:
             if recompile is True:
                 model = tf.keras.models.load_model(weights_path)
