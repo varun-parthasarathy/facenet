@@ -246,7 +246,7 @@ def main(weights_path, lfw_path, image_size, crop_size, model_type,
     model, _ = create_neural_network(model_type=model_type,
                                      embedding_size=embedding_size,
                                      weights_path='',
-                                     input_shape=[image_size, image_size, 3],
+                                     input_shape=[crop_size, crop_size, 3],
                                      training=False)
 
     try:
