@@ -18,130 +18,10 @@ from tensorflow.keras.applications.mobilenet_v2 import MobileNetV2
 from tensorflow.keras.applications.inception_v3 import InceptionV3
 from tensorflow.keras.applications.inception_resnet_v2 import InceptionResNetV2
 from tensorflow.keras.mixed_precision import experimental as mixed_precision
-from custom_triplet_loss import TripletBatchHardLoss, TripletFocalLoss, TripletBatchHardV2Loss, AssortedTripletLoss
 from dataset_utils import generate_training_dataset, get_test_dataset, get_LFW_dataset
-from triplet_callbacks_and_metrics import RangeTestCallback, DecayMarginCallback, TripletLossMetrics, ToggleMetricEval
+from triplet_callbacks_and_metrics import RangeTestCallback
+from arcface_utils import create_neural_network, SoftmaxLoss
 
-
-def create_neural_network(model_type='resnet50', embedding_size=512, input_shape=None, weights_path='',
-                          loss_type='ADAPTIVE', loss_fn=None, recompile=False):
-    base_model = None
-    if model_type == 'resnet50':
-        base_model = ResNet50(weights=None, classes=embedding_size, classifier_activation=None)
-    elif model_type == 'resnet101':
-        base_model = ResNet101(weights=None, classes=embedding_size, classifier_activation=None)
-    elif model_type == 'resnet152':
-        base_model = ResNet152(weights=None, classes=embedding_size, classifier_activation=None)
-    elif model_type == 'inception_v3':
-        base_model = InceptionV3(weights=None, classes=embedding_size, classifier_activation=None)
-    elif model_type == 'efficientnet_b0':
-        base_model = EfficientNetB0(weights=None, classes=embedding_size, classifier_activation=None, 
-                                    activation=tfa.activations.mish)
-    elif model_type == 'efficientnet_b1':
-        base_model = EfficientNetB1(weights=None, classes=embedding_size, classifier_activation=None, 
-                                    activation=tfa.activations.mish)
-    elif model_type == 'efficientnet_b2':
-        base_model = EfficientNetB2(weights=None, classes=embedding_size, classifier_activation=None, 
-                                    activation=tfa.activations.mish)
-    elif model_type == 'efficientnet_b3':
-        base_model = EfficientNetB3(weights=None, classes=embedding_size, classifier_activation=None, 
-                                    activation=tfa.activations.mish)
-    elif model_type == 'efficientnet_b4':
-        base_model = EfficientNetB4(weights=None, classes=embedding_size, classifier_activation=None, 
-                                    activation=tfa.activations.mish)
-    elif model_type == 'efficientnet_b5':
-        base_model = EfficientNetB5(weights=None, classes=embedding_size, classifier_activation=None, 
-                                    activation=tfa.activations.mish)
-    elif model_type == 'efficientnet_b6':
-        base_model = EfficientNetB6(weights=None, classes=embedding_size, classifier_activation=None, 
-                                    activation=tfa.activations.mish)
-    elif model_type == 'efficientnet_b7':
-        base_model = EfficientNetB7(weights=None, classes=embedding_size, classifier_activation=None, 
-                                    activation=tfa.activations.mish)
-    elif model_type == 'inception_resnet_v2':
-        base_model = InceptionResNetV2(weights=None, classes=embedding_size, classifier_activation=None)
-    elif model_type == 'xception':
-        base_model = Xception(weights=None, classes=embedding_size, classifier_activation=None)
-    elif model_type == 'mobilenet':
-        base_model = MobileNet(weights=None, classes=embedding_size, classifier_activation=None)
-    elif model_type == 'mobilenet_v2':
-        base_model = MobileNetV2(weights=None, classes=embedding_size, classifier_activation=None)
-    else:
-        pass
-
-    assert base_model is not None, '[ERROR] The model name was not correctly specified'
-
-    logits = base_model.output # NOT outputs!
-    embeddings = tf.keras.layers.Lambda(lambda x: tf.math.l2_normalize(x, axis=1), dtype='float32',
-                                        name='embeddings')(logits)
-    # embeddings = tf.keras.layers.Activation('linear', dtype='float32')(embeddings)
-    model = Model(inputs=base_model.input, outputs=embeddings)
-    compiled = False
-
-    if input_shape is not None:
-        in_shape = np.array(model.input.shape)
-        in_shape = tuple(in_shape[-3:])
-        assert in_shape == input_shape, '[ERROR] The model input shape and the given input shape do not match'
-
-    if len(weights_path) > 1 and os.path.exists(weights_path):
-        print('[INFO] Attempting to load weights from most recently saved checkpoint')
-        loss_obj = None
-        try:
-            if recompile is True:
-                if loss_type == 'ADAPTIVE':
-                    loss_obj = ['AdaptiveTripletLoss', AdaptiveTripletLoss]
-                elif loss_type == 'FOCAL':
-                    loss_obj = ['TripletFocalLoss', TripletFocalLoss]
-                elif loss_type == 'BATCH_HARD':
-                    loss_obj = ['TripletBatchHardLoss', TripletBatchHardLoss]
-                elif loss_type == 'BATCH_HARD_V2':
-                    loss_obj = ['TripletBatchHardV2Loss', TripletBatchHardV2Loss]
-                elif loss_type == 'ASSORTED':
-                    loss_obj = ['AssortedTripletLoss', AssortedTripletLoss]
-                else:
-                    loss_obj = None
-                if loss_obj is not None:
-                    model = tf.keras.models.load_model(weights_path, custom_objects={loss_obj[0]:loss_obj[1]})
-                else:
-                    model = tf.keras.models.load_model(weights_path)
-                compiled = False
-                print('[WARNING] Model will be compiled again. If you wish to start from a previously saved optimizer state, this is not recommended')
-            else:
-                if loss_type == 'ADAPTIVE':
-                    loss_obj = ['AdaptiveTripletLoss', loss_fn]
-                elif loss_type == 'FOCAL':
-                    loss_obj = ['TripletFocalLoss', loss_fn]
-                elif loss_type == 'BATCH_HARD':
-                    loss_obj = ['TripletBatchHardLoss', loss_fn]
-                elif loss_type == 'BATCH_HARD_V2':
-                    loss_obj = ['TripletBatchHardV2Loss', loss_fn]
-                elif loss_type == 'ASSORTED':
-                    loss_obj = ['AssortedTripletLoss', loss_fn]
-                else:
-                    loss_obj = None
-                if loss_obj is not None:
-                    model = tf.keras.models.load_model(weights_path, custom_objects={loss_obj[0]:loss_obj[1]})
-                else:
-                    model = tf.keras.models.load_model(weights_path)
-                    print('[INFO] Loading model without custom objects')
-                compiled = True
-                print('[WARNING] Model is already compiled; ignoring passed optimizer, loss and learning rate parameters')
-            print('[INFO] Loading model from SavedModel format')
-        except:
-            try:
-                latest = tf.train.latest_checkpoint(weights_path)
-                model.load_weights(latest)
-                print('[WARNING] Loading model weights from ckpt format. Model state is not preserved')
-            except:
-                print('[ERROR] Weights did not match the model architecture specified, or path was incorrect')
-                print('[WARNING] Could not load weights. Using random initialization instead')
-                return model, False
-    else:
-        print('[WARNING] Could not load weights. Using random initialization instead')
-
-    model.summary()
-    
-    return model, compiled
 
 def get_learning_rate_schedule(schedule_name, image_count, batch_size, learning_rate=1e-3, max_lr=0.5,
                                step_size=6000):
@@ -235,11 +115,9 @@ def get_optimizer(optimizer_name, lr_schedule, weight_decay=1e-6):
 def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, init_lr, max_lr, weight_decay, 
                 optimizer, model_type, embedding_size, num_epochs, checkpoint_path, margin=0.35, cache_path=None,
                 range_test=False, use_tpu=False, tpu_name=None, test_path='',
-                use_mixed_precision=False, triplet_strategy='', images_per_person=35, 
-                people_per_sample=12, distance_metric="L2", soft=True, 
-                sigma=0.3, decay_margin_rate=0.0, use_lfw=True, target_margin=0.2, distributed=False,
-                eager_execution=False, weights_path='', checkpoint_interval=5000, use_metrics=False,
-                step_size=6000, recompile=False, steps_per_epoch=None, equisample=False, loss_to_load=''):
+                use_mixed_precision=False, use_lfw=True, distributed=False,
+                eager_execution=False, weights_path='', checkpoint_interval=5000,
+                step_size=6000, recompile=False, steps_per_epoch=None):
 
     if use_tpu is True:
         assert tpu_name is not None, '[ERROR] TPU name must be specified'
@@ -298,53 +176,15 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
         test_dataset = None
 
     run_eagerly = eager_execution if eager_execution is not None else False
-    if triplet_strategy == 'VANILLA':
-        loss_fn = tfa.losses.TripletSemiHardLoss(margin=margin)
-        print('[INFO] Using vanilla triplet loss')
-    elif triplet_strategy == 'BATCH_HARD':
-        loss_fn = TripletBatchHardLoss(margin=margin,
-                                       soft=soft,
-                                       distance_metric=distance_metric)
-        print('[INFO] Using batch-hard strategy.')
-    elif triplet_strategy == 'BATCH_HARD_V2':
-        loss_fn = TripletBatchHardV2Loss(margin1=(-1.0*margin),
-                                         margin2=(margin1/100.0),
-                                         beta=0.002,
-                                         distance_metric=distance_metric)
-        print('[INFO] Using batch-hard V2 strategy')
-    elif triplet_strategy == 'ADAPTIVE':
-        loss_fn = AdaptiveTripletLoss(margin=margin,
-                                      soft=soft,
-                                      lambda_=sigma)
-        run_eagerly = True
-        print('[INFO] Using Adaptive Triplet Loss')
-    elif triplet_strategy == 'ASSORTED':
-        loss_fn = AssortedTripletLoss(margin=margin,
-                                      focal=soft,
-                                      sigma=sigma,
-                                      distance_metric=distance_metric)
-        print('[INFO] Using assorted triplet loss')
-    else:
-        loss_fn = TripletFocalLoss(margin=margin,
-                                   sigma=sigma,
-                                   soft=soft,
-                                   distance_metric=distance_metric)
-        print('[INFO] Using triplet focal loss.')
-
-    if decay_margin_rate > 0 and triplet_strategy != 'BATCH_HARD_V2':
-        decay_margin_callback = DecayMarginCallback(loss_fn, margin, 
-                                                    decay_margin_rate, target_margin)
-        print('[INFO] Using decayed margin to reduce intra-class variability (experimental)')
-    else:
-        decay_margin_callback = None
-
+    
     log_dir = './logs/log_' + datetime.now().strftime("%Y%m%d_%H%M%S")
     tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=log_dir, update_freq=100,
                                                           write_graph=False)
     stop_on_nan = tf.keras.callbacks.TerminateOnNaN()
 
-    triplet_loss_metrics = TripletLossMetrics(test_images, embedding_size)
-    toggle_metrics = ToggleMetricEval()
+    metrics = [tf.keras.metrics.Accuracy, tf.keras.metrics.AUC]
+
+    loss_fn = SoftmaxLoss()
 
     if range_test is True:
         range_finder = RangeTestCallback(start_lr=init_lr,
@@ -359,24 +199,30 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                 model, compiled = create_neural_network(model_type=model_type,
                                                         embedding_size=embedding_size,
                                                         weights_path=weights_path,
-                                                        loss_type=loss_to_load,
-                                                        loss_fn=loss_fn,
-                                                        recompile=recompile)
+                                                        n_classes=n_classes,
+                                                        recompile=recompile,
+                                                        input_shape=[image_size, image_size, 3],
+                                                        training=True,
+                                                        margin=margin,
+                                                        logist_scale=logist_scale)
                 assert model is not None, '[ERROR] There was a problem while loading the pre-trained weights'
                 if compiled is False:
                     print('[INFO] Recompiling model using passed optimizer and loss arguments')
                     model.compile(optimizer=opt,
                                   loss=loss_fn,
-                                  metrics=[triplet_loss_metrics] if use_metrics is True else None,
+                                  metrics=metrics,
                                   run_eagerly=run_eagerly)
         elif distributed is True and use_tpu is False:
             with mirrored_strategy.scope():
                 model, compiled = create_neural_network(model_type=model_type,
                                                         embedding_size=embedding_size,
                                                         weights_path=weights_path,
-                                                        loss_type=loss_to_load,
-                                                        loss_fn=loss_fn,
-                                                        recompile=recompile)
+                                                        n_classes=n_classes,
+                                                        recompile=recompile,
+                                                        input_shape=[image_size, image_size, 3],
+                                                        training=True,
+                                                        margin=margin,
+                                                        logist_scale=logist_scale)
                 opt = get_optimizer(optimizer_name=optimizer,
                                     lr_schedule=1e-5,
                                     weight_decay=weight_decay) # Optimizer must be created within scope!
@@ -385,21 +231,24 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                     print('[INFO] Recompiling model using passed optimizer and loss arguments')
                     model.compile(optimizer=opt,
                                   loss=loss_fn,
-                                  metrics=[triplet_loss_metrics] if use_metrics is True else None,
+                                  metrics=metrics,
                                   run_eagerly=run_eagerly)
         else:
             model, compiled = create_neural_network(model_type=model_type,
                                                     embedding_size=embedding_size,
                                                     weights_path=weights_path,
-                                                    loss_type=loss_to_load,
-                                                    loss_fn=loss_fn,
-                                                    recompile=recompile)
+                                                    n_classes=n_classes,
+                                                    recompile=recompile,
+                                                    input_shape=[image_size, image_size, 3],
+                                                    training=True,
+                                                    margin=margin,
+                                                    logist_scale=logist_scale)
             assert model is not None, '[ERROR] There was a problem while loading the pre-trained weights'
             if compiled is False:
                 print('[INFO] Recompiling model using passed optimizer and loss arguments')
                 model.compile(optimizer=opt,
                               loss=loss_fn,
-                              metrics=[triplet_loss_metrics] if use_metrics is True else None,
+                              metrics=metrics,
                               run_eagerly=run_eagerly)
 
         callback_list = [range_finder, tensorboard_callback, stop_on_nan]
