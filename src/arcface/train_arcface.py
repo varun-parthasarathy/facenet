@@ -113,7 +113,7 @@ def get_optimizer(optimizer_name, lr_schedule, weight_decay=1e-6):
     return opt
 
 def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, init_lr, max_lr, weight_decay, 
-                optimizer, model_type, embedding_size, num_epochs, checkpoint_path, margin=0.35, cache_path=None,
+                optimizer, model_type, embedding_size, num_epochs, checkpoint_path, margin=0.5, cache_path=None,
                 range_test=False, use_tpu=False, tpu_name=None, test_path='',
                 use_mixed_precision=False, use_lfw=True, distributed=False,
                 eager_execution=False, weights_path='', checkpoint_interval=5000,
@@ -252,14 +252,9 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                               run_eagerly=run_eagerly)
 
         callback_list = [range_finder, tensorboard_callback, stop_on_nan]
-        if use_metrics is True:
-            callback_list.append(toggle_metrics)
-        if decay_margin_callback is not None:
-            callback_list.append(decay_margin_callback)
 
         train_history = model.fit(train_dataset, epochs=num_epochs, 
-                                  callbacks=callback_list,
-                                  validation_data=test_dataset)
+                                  callbacks=callback_list)
 
         print('\n[INFO] Training complete. Range test results can be found at "./range_test_result.png"')
 
@@ -290,24 +285,30 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                 model, compiled = create_neural_network(model_type=model_type,
                                                         embedding_size=embedding_size,
                                                         weights_path=weights_path,
-                                                        loss_type=loss_to_load,
-                                                        loss_fn=loss_fn,
-                                                        recompile=recompile)
+                                                        n_classes=n_classes,
+                                                        recompile=recompile,
+                                                        input_shape=[image_size, image_size, 3],
+                                                        training=True,
+                                                        margin=margin,
+                                                        logist_scale=logist_scale)
                 assert model is not None, '[ERROR] There was a problem in loading the pre-trained weights'
                 if compiled is False:
                     print('[INFO] Recompiling model using passed optimizer and loss arguments')
                     model.compile(optimizer=opt,
                                   loss=loss_fn,
-                                  metrics=[triplet_loss_metrics] if use_metrics is True else None,
+                                  metrics=metrics,
                                   run_eagerly=run_eagerly)
         elif distributed is True and use_tpu is False:
             with mirrored_strategy.scope():
                 model, compiled = create_neural_network(model_type=model_type,
                                                         embedding_size=embedding_size,
                                                         weights_path=weights_path,
-                                                        loss_type=loss_to_load,
-                                                        loss_fn=loss_fn,
-                                                        recompile=recompile)
+                                                        n_classes=n_classes,
+                                                        recompile=recompile,
+                                                        input_shape=[image_size, image_size, 3],
+                                                        training=True,
+                                                        margin=margin,
+                                                        logist_scale=logist_scale)
                 opt = get_optimizer(optimizer_name=optimizer,
                                     lr_schedule=lr_schedule,
                                     weight_decay=weight_decay) # Optimizer must be created within scope!
@@ -316,33 +317,31 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                     print('[INFO] Recompiling model using passed optimizer and loss arguments')
                     model.compile(optimizer=opt,
                                   loss=loss_fn,
-                                  metrics=[triplet_loss_metrics] if use_metrics is True else None,
+                                  metrics=metrics,
                                   run_eagerly=run_eagerly)
         else:
             model, compiled = create_neural_network(model_type=model_type,
                                                     embedding_size=embedding_size,
                                                     weights_path=weights_path,
-                                                    loss_type=loss_to_load,
-                                                    loss_fn=loss_fn,
-                                                    recompile=recompile)
+                                                    n_classes=n_classes,
+                                                    recompile=recompile,
+                                                    input_shape=[image_size, image_size, 3],
+                                                    training=True,
+                                                    margin=margin,
+                                                    logist_scale=logist_scale)
             assert model is not None, '[ERROR] There was a problem in loading the pre-trained weights'
             if compiled is False:
                 print('[INFO] Recompiling model using passed optimizer and loss arguments')
                 model.compile(optimizer=opt,
                               loss=loss_fn,
-                              metrics=[triplet_loss_metrics] if use_metrics is True else None,
+                              metrics=metrics,
                               run_eagerly=run_eagerly)
 
         callback_list = [checkpoint_saver, tensorboard_callback, stop_on_nan]
-        if use_metrics is True:
-            callback_list.append(toggle_metrics)
-        if decay_margin_callback is not None:
-            callback_list.append(decay_margin_callback)
 
         train_history = model.fit(train_dataset, 
                                   epochs=num_epochs, 
                                   callbacks=callback_list, 
-                                  validation_data=test_dataset,
                                   steps_per_epoch=None if steps_per_epoch == 0 else steps_per_epoch)
         
         if not os.path.exists('./results'):
@@ -377,12 +376,12 @@ if __name__ == '__main__':
                         choices=['RMSPROP', 'SGDW', 'ADAM', 'ADAGRAD', 'ADADELTA', 'LOOKAHEAD_SGD', 
                                  'LOOKAHEAD_ADAM', 'RANGER'],
                         help='Optimizer to use for training. Default is RMSprop')
-    parser.add_argument('--model', required=False, type=str, default='inception_v3',
+    parser.add_argument('--model', required=False, type=str, default='resnet50',
                         choices=['resnet50', 'resnet101', 'resnet152', 'inception_v3', 'efficientnet_b0',
                                  'efficientnet_b1', 'efficientnet_b2', 'efficientnet_b3', 'efficientnet_b4', 
                                  'efficientnet_b5', 'efficientnet_b6', 'efficientnet_b7', 'inception_resnet_v2',
                                  'xception', 'mobilenet', 'mobilenet_v2'],
-                        help='NN architecture to use. Default is InceptionV3')
+                        help='NN architecture to use. Default is ResNet-50')
     parser.add_argument('--embedding_size', required=False, type=int, default=512,
                         help='Embedding size for triplet loss')
     parser.add_argument('--cache_path', required=False, type=str, default='./face_cache.tfcache',
@@ -390,7 +389,7 @@ if __name__ == '__main__':
     parser.add_argument('--epochs', required=False, type=int, default=100,
                         help='Number of epochs to train for')
     parser.add_argument('--margin', required=False, type=float, default=0.2,
-                        help='Margin to use for triplet semi-hard loss')
+                        help='ArcFace margin to use')
     parser.add_argument('--checkpoint_path', required=False, type=str, default='./checkpoints',
                         help='Path to folder in which checkpoints are to be saved')
     parser.add_argument('--range_test', action='store_true',
@@ -403,26 +402,8 @@ if __name__ == '__main__':
                         help='Path to test dataset, if you want to check validation loss. Optional but recommended')
     parser.add_argument('--use_mixed_precision', action='store_true',
                         help='Use mixed precision for training. Can greatly reduce memory consumption')
-    parser.add_argument('--triplet_strategy', type=str, default='FOCAL',
-                        choices=['VANILLA', 'BATCH_HARD', 'BATCH_HARD_V2', 'FOCAL', 'ADAPTIVE', 'ASSORTED'],
-                        help='Choice of triplet loss formulation. Default is FOCAL')
-    parser.add_argument('--images_per_person', required=False, type=int, default=35,
-                        help='Average number of images per class. Default is 35 (from MS1M cleaned + AsianCeleb)')
-    parser.add_argument('--people_per_sample', required=False, type=int, default=50,
-                        help='Number of people per sample. Helps fill buffer for shuffling the dataset properly')
-    parser.add_argument('--distance_metric', required=False, type=str, default='L2',
-                        choices=['L2', 'squared-L2', 'angular'],
-                        help='Choice of distance metric. Default is Euclidean distance')
-    parser.add_argument('--soft', action='store_true',
-                        help='Use soft margin. For ASSORTED strategy, sets whether to use triplet focal loss or not')
-    parser.add_argument('--sigma', type=float, required=False, default=0.3,
-                        help='Value of sigma for FOCAL strategy. For ADAPTIVE strategy, specifies lambda')
-    parser.add_argument('--decay_margin_rate', type=float, required=False, default=0.0,
-                        help='Decay rate for margin. Recommended value to set is 0.9965')
     parser.add_argument('--use_lfw', action='store_true',
                         help='Specifies whether test dataset is the LFW dataset or not')
-    parser.add_argument('--target_margin', type=float, default=0.2, required=False,
-                        help='Minimum margin when using decayed margin')
     parser.add_argument('--distributed', action='store_true',
                         help='Use distributed training strategy for multiple GPUs. Does not work with TPU')
     parser.add_argument('--eager_execution', action='store_true',
@@ -431,19 +412,12 @@ if __name__ == '__main__':
                         help='Path to saved weights/checkpoints (if using saved weights for further training)')
     parser.add_argument('--checkpoint_interval', type=int, default=5000, required=False,
                         help='Frequency of model checkpointing. Default is every 5000 steps')
-    parser.add_argument('--use_metrics', action='store_true',
-                        help='Include triplet metric evaluation during training. Not recommended when checkpointing is mandatory as custom metrics cannot be restored properly')
     parser.add_argument('--step_size', type=int, default=6000, required=False,
                         help='Step size for cyclic learning rate policies')
     parser.add_argument('--recompile', action='store_true',
                         help='Recompile model. Recommended for constant learning rate')
     parser.add_argument('--steps_per_epoch', type=int, default=0, required=False,
                         help='Number of steps before an epoch is completed. Default is 0')
-    parser.add_argument('--equisample', action='store_true',
-                        help='Determines whether to sample images from each class equally to form a batch. Will have performance drawbacks if enabled')
-    parser.add_argument('--loss_to_load', type=str, default='FOCAL',
-                        choices=['VANILLA', 'BATCH_HARD', 'BATCH_HARD_V2', 'FOCAL', 'ADAPTIVE', 'ASSORTED'],
-                        help='Choice of triplet loss object for loading models. Default is FOCAL')
 
     args = vars(parser.parse_args())
 
