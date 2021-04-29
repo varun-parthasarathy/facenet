@@ -114,10 +114,10 @@ def get_optimizer(optimizer_name, lr_schedule, weight_decay=1e-6):
 
 def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, init_lr, max_lr, weight_decay, 
                 optimizer, model_type, embedding_size, num_epochs, checkpoint_path, margin=0.5, cache_path=None,
-                range_test=False, use_tpu=False, tpu_name=None, test_path='',
-                use_mixed_precision=False, use_lfw=True, distributed=False,
+                range_test=False, use_tpu=False, tpu_name=None,
+                use_mixed_precision=False, distributed=False,
                 eager_execution=False, weights_path='', checkpoint_interval=5000,
-                step_size=6000, recompile=False, steps_per_epoch=None):
+                step_size=6000, recompile=False, steps_per_epoch=None, logist_scale=64):
 
     if use_tpu is True:
         assert tpu_name is not None, '[ERROR] TPU name must be specified'
@@ -145,35 +145,10 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                                                  crop_size=crop_size, 
                                                                  cache=cache_path,
                                                                  use_mixed_precision=use_mixed_precision,
-                                                                 images_per_person=images_per_person,
-                                                                 people_per_sample=people_per_sample,
                                                                  use_tpu=use_tpu,
-                                                                 model_type=model_type,
-                                                                 equisample=equisample)
+                                                                 model_type=model_type)
 
-    if test_path is not None and len(test_path) > 1:
-        if use_lfw is True:
-            test_dataset, test_images, _ = get_LFW_dataset(data_path=test_path, 
-                                                           image_size=image_size, 
-                                                           batch_size=batch_size,
-                                                           crop_size=crop_size,
-                                                           cache='./lfw_dataset_cache.tfcache',
-                                                           use_mixed_precision=use_mixed_precision,
-                                                           use_tpu=use_tpu,
-                                                           train_classes=n_classes,
-                                                           model_type=model_type)
-        else:
-            test_dataset, test_images, _ = get_test_dataset(data_path=test_path, 
-                                                            image_size=image_size, 
-                                                            batch_size=30,
-                                                            crop_size=crop_size,
-                                                            cache='./test_dataset_cache.tfcache',
-                                                            use_mixed_precision=use_mixed_precision,
-                                                            use_tpu=use_tpu,
-                                                            train_classes=n_classes,
-                                                            model_type=model_type)
-    else:
-        test_dataset = None
+    test_dataset = None
 
     run_eagerly = eager_execution if eager_execution is not None else False
     
@@ -398,12 +373,8 @@ if __name__ == '__main__':
                         help='Whether to use a TPU for training. Default is no')
     parser.add_argument('--tpu_name', required=False, type=str,
                         help='If using a TPU, specify the TPU name')
-    parser.add_argument('--test_path', required=False, type=str,
-                        help='Path to test dataset, if you want to check validation loss. Optional but recommended')
     parser.add_argument('--use_mixed_precision', action='store_true',
                         help='Use mixed precision for training. Can greatly reduce memory consumption')
-    parser.add_argument('--use_lfw', action='store_true',
-                        help='Specifies whether test dataset is the LFW dataset or not')
     parser.add_argument('--distributed', action='store_true',
                         help='Use distributed training strategy for multiple GPUs. Does not work with TPU')
     parser.add_argument('--eager_execution', action='store_true',
@@ -418,6 +389,8 @@ if __name__ == '__main__':
                         help='Recompile model. Recommended for constant learning rate')
     parser.add_argument('--steps_per_epoch', type=int, default=0, required=False,
                         help='Number of steps before an epoch is completed. Default is 0')
+    parser.add_argument('--logist_scale', type=int, default=64, required=False,
+                        help='Logit scale for ArcFace')
 
     args = vars(parser.parse_args())
 
@@ -439,24 +412,12 @@ if __name__ == '__main__':
                 range_test=args['range_test'],
                 use_tpu=args['use_tpu'],
                 tpu_name=args['tpu_name'],
-                test_path=args['test_path'],
                 use_mixed_precision=args['use_mixed_precision'],
-                triplet_strategy=args['triplet_strategy'],
-                images_per_person=args['images_per_person'],
-                people_per_sample=args['people_per_sample'],
-                distance_metric=args['distance_metric'],
-                soft=args['soft'],
-                sigma=args['sigma'],
-                decay_margin_rate=args['decay_margin_rate'],
-                use_lfw=args['use_lfw'],
-                target_margin=args['target_margin'],
                 distributed=args['distributed'],
                 eager_execution=args['eager_execution'],
                 weights_path=args['weights_path'],
                 checkpoint_interval=args['checkpoint_interval'],
-                use_metrics=args['use_metrics'],
                 step_size=args['step_size'],
                 recompile=args['recompile'],
                 steps_per_epoch=args['steps_per_epoch'],
-                equisample=args['equisample'],
-                loss_to_load=args['loss_to_load'])
+                logist_scale=args['logist_scale'])
