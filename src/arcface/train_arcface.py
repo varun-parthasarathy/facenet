@@ -10,7 +10,6 @@ import matplotlib.pyplot as plt
 from scipy.signal import savgol_filter
 from tensorflow.keras.models import Model
 from tensorflow.keras.applications.resnet import *
-from adaptive_triplet_loss import AdaptiveTripletLoss
 from tensorflow.keras.applications.efficientnet import *
 from tensorflow.keras.applications.xception import Xception
 from tensorflow.keras.applications.mobilenet import MobileNet
