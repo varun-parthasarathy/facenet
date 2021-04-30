@@ -54,8 +54,8 @@ def OutputLayer(embd_shape, name='OutputLayer'):
         x = BatchNormalization()(x)
         x = Dropout(0.5)(x)
         x = Flatten()(x)
-        x = Dense(embd_shape)(x)
-        x = BatchNormalization()(x)
+        x = Dense(embd_shape, dtype='float32')(x)
+        x = BatchNormalization(dtype='float32')(x)
         return Model(inputs, x, name=name)(x_in)
     return output_layer
 
@@ -63,7 +63,7 @@ def ArcHead(num_classes, margin=0.5, logist_scale=64, name='ArcHead'):
     """Arc Head"""
     def arc_head(x_in, y_in):
         x = inputs1 = Input(x_in.shape[1:])
-        y = Input(y_in.shape[1:])
+        y = Input(y_in.shape[1:], dtype='float32')
         x = ArcMarginPenaltyLogits(num_classes=num_classes,
                                    margin=margin,
                                    logist_scale=logist_scale)(x, y)
@@ -125,7 +125,7 @@ def create_neural_network(model_type='resnet50', n_classes=2, embedding_size=512
     X = Backbone(model_type=model_type)(X)
     embeddings = OutputLayer(embd_shape=embedding_size)(X)
     if training is True:
-        labels = Input([], name='labels')
+        labels = Input([], name='labels', dtype='float32')
         logits = ArcHead(num_classes=n_classes,
                          margin=margin,
                          logist_scale=logist_scale)(embeddings, labels)
