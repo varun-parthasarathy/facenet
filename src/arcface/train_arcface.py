@@ -156,8 +156,6 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                                           write_graph=False)
     stop_on_nan = tf.keras.callbacks.TerminateOnNaN()
 
-    metrics = [tf.keras.metrics.Accuracy, tf.keras.metrics.AUC]
-
     loss_fn = SoftmaxLoss()
 
     if range_test is True:
@@ -184,7 +182,6 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                     print('[INFO] Recompiling model using passed optimizer and loss arguments')
                     model.compile(optimizer=opt,
                                   loss=loss_fn,
-                                  metrics=metrics,
                                   run_eagerly=run_eagerly)
         elif distributed is True and use_tpu is False:
             with mirrored_strategy.scope():
@@ -205,7 +202,6 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                     print('[INFO] Recompiling model using passed optimizer and loss arguments')
                     model.compile(optimizer=opt,
                                   loss=loss_fn,
-                                  metrics=metrics,
                                   run_eagerly=run_eagerly)
         else:
             model, compiled = create_neural_network(model_type=model_type,
@@ -222,7 +218,6 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                 print('[INFO] Recompiling model using passed optimizer and loss arguments')
                 model.compile(optimizer=opt,
                               loss=loss_fn,
-                              metrics=metrics,
                               run_eagerly=run_eagerly)
 
         callback_list = [range_finder, tensorboard_callback, stop_on_nan]
@@ -276,7 +271,6 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                     print('[INFO] Recompiling model using passed optimizer and loss arguments')
                     model.compile(optimizer=opt,
                                   loss=loss_fn,
-                                  metrics=metrics,
                                   run_eagerly=run_eagerly)
         elif distributed is True and use_tpu is False:
             with mirrored_strategy.scope():
@@ -297,7 +291,6 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                     print('[INFO] Recompiling model using passed optimizer and loss arguments')
                     model.compile(optimizer=opt,
                                   loss=loss_fn,
-                                  metrics=metrics,
                                   run_eagerly=run_eagerly)
         else:
             model, compiled = create_neural_network(model_type=model_type,
@@ -314,7 +307,6 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                 print('[INFO] Recompiling model using passed optimizer and loss arguments')
                 model.compile(optimizer=opt,
                               loss=loss_fn,
-                              metrics=metrics,
                               run_eagerly=run_eagerly)
 
         callback_list = [model_saver, weights_saver, tensorboard_callback, stop_on_nan]
