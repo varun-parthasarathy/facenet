@@ -14,7 +14,7 @@ from tensorflow.keras.applications.inception_resnet_v2 import InceptionResNetV2
 
 class ArcMarginPenaltyLogits(tf.keras.layers.Layer):
     def __init__(self, num_classes, margin=0.5, logist_scale=64, **kwargs):
-        super(ArcMarginPenaltyLogists, self).__init__(**kwargs)
+        super(ArcMarginPenaltyLogits, self).__init__(**kwargs)
         self.num_classes = num_classes
         self.margin = margin
         self.logist_scale = logist_scale
