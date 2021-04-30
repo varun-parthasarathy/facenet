@@ -33,7 +33,13 @@ class ArcMarginPenaltyLogits(tf.keras.layers.Layer):
         normed_w = tf.nn.l2_normalize(self.w, axis=0, name='normed_weights')
 
         cos_t = tf.matmul(normed_embds, normed_w, name='cos_t')
-        sin_t = tf.cast(tf.sqrt(1. - cos_t ** 2, name='sin_t'), cos_t.dtype)
+        sin_t = tf.sqrt(1. - cos_t ** 2, name='sin_t')
+
+        if self.cos_m.dtype != cos_t.dtype:
+            self.cos_m = tf.cast(self.cos_m, cos_t.dtype)
+            self.sin_m = tf.cast(self.sin_m, sin_t.dtype)
+            self.th = tf.cast(self.th, cos_t.dtype)
+            self.mm = tf.cast(self.mm, cos_t.dtype)
 
         cos_mt = tf.subtract(
             cos_t * self.cos_m, sin_t * self.sin_m, name='cos_mt')
