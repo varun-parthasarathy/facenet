@@ -1,8 +1,15 @@
 import tensorflow as tf
 import tensorflow_addons as tfa
 import math
-from tf.keras.layers import Input, Dropout, BatchNormalization, Flatten, Dense
-from tf.keras.models import Model
+from tensorflow.keras.layers import Input, Dropout, BatchNormalization, Flatten, Dense
+from tensorflow.keras.models import Model
+from tensorflow.keras.applications.resnet import *
+from tensorflow.keras.applications.efficientnet import *
+from tensorflow.keras.applications.xception import Xception
+from tensorflow.keras.applications.mobilenet import MobileNet
+from tensorflow.keras.applications.mobilenet_v2 import MobileNetV2
+from tensorflow.keras.applications.inception_v3 import InceptionV3
+from tensorflow.keras.applications.inception_resnet_v2 import InceptionResNetV2
 
 
 class ArcMarginPenaltyLogits(tf.keras.layers.Layer):
@@ -116,7 +123,7 @@ def create_neural_network(model_type='resnet50', n_classes=2, embedding_size=512
 
     X = inputs = Input(input_shape, name='image_inputs')
     X = Backbone(model_type=model_type)(X)
-    embeddings = OutputLayer(embd_shape=embedding_size)
+    embeddings = OutputLayer(embd_shape=embedding_size)(X)
     if training is True:
         labels = Input([], name='labels')
         logits = ArcHead(num_classes=n_classes,
