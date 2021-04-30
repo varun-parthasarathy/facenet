@@ -1,6 +1,7 @@
+import os
+import math
 import tensorflow as tf
 import tensorflow_addons as tfa
-import math
 from tensorflow.keras.layers import Input, Dropout, BatchNormalization, Flatten, Dense
 from tensorflow.keras.models import Model
 from tensorflow.keras.applications.resnet import *
