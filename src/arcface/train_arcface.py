@@ -17,7 +17,7 @@ from tensorflow.keras.applications.mobilenet_v2 import MobileNetV2
 from tensorflow.keras.applications.inception_v3 import InceptionV3
 from tensorflow.keras.applications.inception_resnet_v2 import InceptionResNetV2
 from tensorflow.keras.mixed_precision import experimental as mixed_precision
-from dataset_utils import generate_training_dataset, get_test_dataset, get_LFW_dataset
+from dataset_utils import generate_training_dataset
 from triplet_callbacks_and_metrics import RangeTestCallback
 from arcface_utils import create_neural_network, SoftmaxLoss
 

@@ -1,6 +1,8 @@
 import tensorflow as tf
 import tensorflow_addons as tfa
 import math
+from tf.keras.layers import Input, Dropout, BatchNormalization, Flatten, Dense
+from tf.keras.models import Model
 
 
 class ArcMarginPenaltyLogits(tf.keras.layers.Layer):
@@ -42,7 +44,7 @@ class ArcMarginPenaltyLogits(tf.keras.layers.Layer):
 def OutputLayer(embd_shape, name='OutputLayer'):
     def output_layer(x_in):
         x = inputs = Input(x_in.shape[1:])
-        x = tf.keras.layers.BatchNormalization()(x)
+        x = BatchNormalization()(x)
         x = Dropout(0.5)(x)
         x = Flatten()(x)
         x = Dense(embd_shape)(x)

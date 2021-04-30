@@ -14,7 +14,7 @@ from sklearn import metrics
 from scipy import interpolate
 from scipy.optimize import brentq
 from sklearn.model_selection import KFold
-from arcface_utils import create_neural_network
+from arcface_utils import create_neural_network, SoftmaxLoss
 
 def _get_paths(lfw_dir, pairs):
     nrof_skipped_pairs = 0
@@ -250,9 +250,11 @@ def main(weights_path, lfw_path, image_size, crop_size, model_type,
                                      training=False)
 
     try:
-        model.load_weights(weights_path)
+        model.compile(optimizer='sgd',
+                      loss=SoftmaxLoss())
+        model.load_weights(os.path.join(weights_path, 'model_weights'))
     except:
-        model = tf.keras.models.load_model(weights_path)
+        model = tf.keras.models.load_model(os.path.join(weights_path, 'full_model'))
 
     lfw_ds, nrof_images, _, actual_issame = get_LFW_dataset(data_path=lfw_path, 
                                                             image_size=image_size, 
