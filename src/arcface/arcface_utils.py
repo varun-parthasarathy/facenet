@@ -130,21 +130,21 @@ def create_neural_network(model_type='resnet50', n_classes=2, embedding_size=512
         print('[INFO] Attempting to load weights from most recently saved checkpoint')
         try:
             if recompile is True:
-                model = tf.keras.models.load_model(weights_path)
+                model = tf.keras.models.load_model(os.path.join(weights_path, 'full_model'))
                 compiled = False
                 print('[WARNING] Model will be compiled again. If you wish to start from a previously saved optimizer state, this is not recommended')
             else:
-                model = tf.keras.models.load_model(weights_path)
+                model = tf.keras.models.load_model(os.path.join(weights_path, 'full_model'))
                 compiled = True
                 print('[WARNING] Model is already compiled; ignoring passed optimizer, loss and learning rate parameters')
             print('[INFO] Loading model from SavedModel format')
         except:
             try:
                 try:
-                    model.load_weights(weights_path)
+                    model.load_weights(os.path.join(weights_path, 'model_weights'))
                 except:
                     latest = tf.train.latest_checkpoint(weights_path)
-                    model.load_weights(latest)
+                    model.load_weights(os.path.join(weights_path, 'model_weights'))
                 print('[WARNING] Loading model weights from ckpt format. Model state is not preserved')
             except:
                 print('[ERROR] Weights did not match the model architecture specified, or path was incorrect')

@@ -249,12 +249,18 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
             os.mkdir(checkpoint_path)
 
         #checkpoint_name = checkpoint_path + '/' + 'cp-{epoch:03d}.ckpt'
-        checkpoint_saver = tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_path,
-                                                              save_weights_only=True,
-                                                              monitor='val_loss',
-                                                              mode='min',
-                                                              save_best_only=False,
-                                                              save_freq=checkpoint_interval)
+        model_saver = tf.keras.callbacks.ModelCheckpoint(filepath=os.path.join(checkpoint_path, 'full_model'),
+                                                         save_weights_only=False,
+                                                         monitor='val_loss',
+                                                         mode='min',
+                                                         save_best_only=False,
+                                                         save_freq=checkpoint_interval)
+        weights_saver = tf.keras.callbacks.ModelCheckpoint(filepath=os.path.join(checkpoint_path, 'model_weights'),
+                                                           save_weights_only=True,
+                                                           monitor='val_loss',
+                                                           mode='min',
+                                                           save_best_only=False,
+                                                           save_freq=checkpoint_interval)
         if use_tpu is True:
             with strategy.scope():
                 model, compiled = create_neural_network(model_type=model_type,
@@ -312,7 +318,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                               metrics=metrics,
                               run_eagerly=run_eagerly)
 
-        callback_list = [checkpoint_saver, tensorboard_callback, stop_on_nan]
+        callback_list = [model_saver, weights_saver, tensorboard_callback, stop_on_nan]
 
         train_history = model.fit(train_dataset, 
                                   epochs=num_epochs, 
