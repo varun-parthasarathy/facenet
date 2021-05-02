@@ -21,6 +21,7 @@ from tensorflow.keras.mixed_precision import experimental as mixed_precision
 from custom_triplet_loss import TripletBatchHardLoss, TripletFocalLoss, TripletBatchHardV2Loss, AssortedTripletLoss
 from dataset_utils import generate_training_dataset, get_test_dataset, get_LFW_dataset
 from triplet_callbacks_and_metrics import RangeTestCallback, DecayMarginCallback, TripletLossMetrics, ToggleMetricEval
+from model_utils inport create_neural_network_v2
 
 
 def create_neural_network(model_type='resnet50', embedding_size=512, input_shape=None, weights_path='',
@@ -356,12 +357,13 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                             weight_decay=weight_decay)
         if use_tpu is True:
             with strategy.scope():
-                model, compiled = create_neural_network(model_type=model_type,
+                model, compiled = create_neural_network_v2(model_type=model_type,
                                                         embedding_size=embedding_size,
                                                         weights_path=weights_path,
                                                         loss_type=loss_to_load,
                                                         loss_fn=loss_fn,
-                                                        recompile=recompile)
+                                                        recompile=recompile,
+                                                        input_shape=[crop_size, crop_size, 3])
                 assert model is not None, '[ERROR] There was a problem while loading the pre-trained weights'
                 if compiled is False:
                     print('[INFO] Recompiling model using passed optimizer and loss arguments')
@@ -371,12 +373,13 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                   run_eagerly=run_eagerly)
         elif distributed is True and use_tpu is False:
             with mirrored_strategy.scope():
-                model, compiled = create_neural_network(model_type=model_type,
+                model, compiled = create_neural_network_v2(model_type=model_type,
                                                         embedding_size=embedding_size,
                                                         weights_path=weights_path,
                                                         loss_type=loss_to_load,
                                                         loss_fn=loss_fn,
-                                                        recompile=recompile)
+                                                        recompile=recompile,
+                                                        input_shape=[crop_size, crop_size, 3])
                 opt = get_optimizer(optimizer_name=optimizer,
                                     lr_schedule=1e-5,
                                     weight_decay=weight_decay) # Optimizer must be created within scope!
@@ -388,12 +391,13 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                   metrics=[triplet_loss_metrics] if use_metrics is True else None,
                                   run_eagerly=run_eagerly)
         else:
-            model, compiled = create_neural_network(model_type=model_type,
+            model, compiled = create_neural_network_v2(model_type=model_type,
                                                     embedding_size=embedding_size,
                                                     weights_path=weights_path,
                                                     loss_type=loss_to_load,
                                                     loss_fn=loss_fn,
-                                                    recompile=recompile)
+                                                    recompile=recompile,
+                                                    input_shape=[crop_size, crop_size, 3])
             assert model is not None, '[ERROR] There was a problem while loading the pre-trained weights'
             if compiled is False:
                 print('[INFO] Recompiling model using passed optimizer and loss arguments')
@@ -438,12 +442,13 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                                               save_freq=checkpoint_interval)
         if use_tpu is True:
             with strategy.scope():
-                model, compiled = create_neural_network(model_type=model_type,
+                model, compiled = create_neural_network_v2(model_type=model_type,
                                                         embedding_size=embedding_size,
                                                         weights_path=weights_path,
                                                         loss_type=loss_to_load,
                                                         loss_fn=loss_fn,
-                                                        recompile=recompile)
+                                                        recompile=recompile,
+                                                        input_shape=[crop_size, crop_size, 3])
                 assert model is not None, '[ERROR] There was a problem in loading the pre-trained weights'
                 if compiled is False:
                     print('[INFO] Recompiling model using passed optimizer and loss arguments')
@@ -453,12 +458,13 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                   run_eagerly=run_eagerly)
         elif distributed is True and use_tpu is False:
             with mirrored_strategy.scope():
-                model, compiled = create_neural_network(model_type=model_type,
+                model, compiled = create_neural_network_v2(model_type=model_type,
                                                         embedding_size=embedding_size,
                                                         weights_path=weights_path,
                                                         loss_type=loss_to_load,
                                                         loss_fn=loss_fn,
-                                                        recompile=recompile)
+                                                        recompile=recompile,
+                                                        input_shape=[crop_size, crop_size, 3])
                 opt = get_optimizer(optimizer_name=optimizer,
                                     lr_schedule=lr_schedule,
                                     weight_decay=weight_decay) # Optimizer must be created within scope!
@@ -470,12 +476,13 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                   metrics=[triplet_loss_metrics] if use_metrics is True else None,
                                   run_eagerly=run_eagerly)
         else:
-            model, compiled = create_neural_network(model_type=model_type,
+            model, compiled = create_neural_network_v2(model_type=model_type,
                                                     embedding_size=embedding_size,
                                                     weights_path=weights_path,
                                                     loss_type=loss_to_load,
                                                     loss_fn=loss_fn,
-                                                    recompile=recompile)
+                                                    recompile=recompile,
+                                                    input_shape=[crop_size, crop_size, 3])
             assert model is not None, '[ERROR] There was a problem in loading the pre-trained weights'
             if compiled is False:
                 print('[INFO] Recompiling model using passed optimizer and loss arguments')
