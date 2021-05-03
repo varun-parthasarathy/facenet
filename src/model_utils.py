@@ -77,11 +77,14 @@ def Backbone(model_type='resnet50', use_imagenet=True):
         return base_model
     return backbone
 
-def OutputLayer(embedding_size=512, name='OutputLayer'):
+def OutputLayer(embedding_size=512, name='OutputLayer', model_type='resnet50'):
     def output_layer(x_in):
         inputs = Input(x_in.shape[1:])
-        x = Dropout(0.3, name='top_dropout')(inputs)
-        logits = Dense(embedding_size, activation=None)(x)
+        if 'efficientnet' in model_type:
+            x = Dropout(0.3, name='top_dropout')(inputs)
+            logits = Dense(embedding_size, activation=None)(x)
+        else:
+            logits = Dense(embedding_size, activation=None)(inputs)
         embeddings = tf.keras.layers.Lambda(lambda k: tf.math.l2_normalize(k, axis=1), dtype='float32',
                                             name='embeddings')(logits)
         return Model(inputs=inputs, outputs=embeddings, name=name)(x_in)
@@ -107,7 +110,7 @@ def create_neural_network_v2(model_type='resnet50', embedding_size=512, input_sh
     '''
     inputs = Input(input_shape, name='image_input')
     backbone = Backbone(model_type=model_type, use_imagenet=use_imagenet)(inputs)
-    embeddings = OutputLayer(embedding_size=embedding_size)(backbone)
+    embeddings = OutputLayer(embedding_size=embedding_size, model_type=model_type)(backbone)
     
     model = Model(inputs=inputs, outputs=embeddings)
     model.summary()
