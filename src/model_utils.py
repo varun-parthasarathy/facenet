@@ -91,6 +91,19 @@ def create_neural_network_v2(model_type='resnet50', embedding_size=512, input_sh
                              use_imagenet=True):
 
     assert input_shape is not None, '[ERROR] Input shape not specified correctly!'
+    assert len(input_shape) == 3, '[ERROR] Input shape must be of the form [height, width, channels]'
+    '''
+        The above assertion is simply so that another Monty Python reference can be snuck into the code.
+        It makes things more fun to read.
+
+        And then the Lord spake, saying:
+        "First, shalt thou take out the model's top layer. Then shalt thou count to three.
+        No more, no less. Then shalt thou count to three, no more, no less. Three shall be the
+        number thou shalt count, and the number of the counting shall be three. Four shalt thou 
+        not count, neither count thou two, excepting that thou then proceed to three. Five is 
+        right out. Once the number three, being the third number, be reached, then createst thou 
+        thy input layer, which having a 3-dimensional shape, shall serve you well."
+    '''
     inputs = Input(input_shape, name='image_input')
     backbone = Backbone(model_type=model_type, use_imagenet=use_imagenet)(inputs)
     embeddings = OutputLayer(embedding_size=embedding_size)(backbone)
