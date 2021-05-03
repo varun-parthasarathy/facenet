@@ -240,7 +240,8 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                 people_per_sample=12, distance_metric="L2", soft=True, 
                 sigma=0.3, decay_margin_rate=0.0, use_lfw=True, target_margin=0.2, distributed=False,
                 eager_execution=False, weights_path='', checkpoint_interval=5000, use_metrics=False,
-                step_size=6000, recompile=False, steps_per_epoch=None, equisample=False, loss_to_load=''):
+                step_size=6000, recompile=False, steps_per_epoch=None, equisample=False, loss_to_load='',
+                use_imagenet=False):
 
     if use_tpu is True:
         assert tpu_name is not None, '[ERROR] TPU name must be specified'
@@ -261,6 +262,9 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
     if distributed is True and use_tpu is False:
         mirrored_strategy = tf.distribute.MirroredStrategy()
         print("[INFO] Using distributed training strategy on GPU")
+
+    if use_imagenet is None:
+        use_imagenet = False
 
     train_dataset, n_imgs, n_classes = generate_training_dataset(data_path=data_path, 
                                                                  image_size=image_size, 
@@ -363,7 +367,8 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                                         loss_type=loss_to_load,
                                                         loss_fn=loss_fn,
                                                         recompile=recompile,
-                                                        input_shape=[crop_size, crop_size, 3])
+                                                        input_shape=[crop_size, crop_size, 3],
+                                                        use_imagenet=use_imagenet)
                 assert model is not None, '[ERROR] There was a problem while loading the pre-trained weights'
                 if compiled is False:
                     print('[INFO] Recompiling model using passed optimizer and loss arguments')
@@ -379,7 +384,8 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                                         loss_type=loss_to_load,
                                                         loss_fn=loss_fn,
                                                         recompile=recompile,
-                                                        input_shape=[crop_size, crop_size, 3])
+                                                        input_shape=[crop_size, crop_size, 3],
+                                                        use_imagenet=use_imagenet)
                 opt = get_optimizer(optimizer_name=optimizer,
                                     lr_schedule=1e-5,
                                     weight_decay=weight_decay) # Optimizer must be created within scope!
@@ -397,7 +403,8 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                                     loss_type=loss_to_load,
                                                     loss_fn=loss_fn,
                                                     recompile=recompile,
-                                                    input_shape=[crop_size, crop_size, 3])
+                                                    input_shape=[crop_size, crop_size, 3],
+                                                    use_imagenet=use_imagenet)
             assert model is not None, '[ERROR] There was a problem while loading the pre-trained weights'
             if compiled is False:
                 print('[INFO] Recompiling model using passed optimizer and loss arguments')
@@ -448,7 +455,8 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                                         loss_type=loss_to_load,
                                                         loss_fn=loss_fn,
                                                         recompile=recompile,
-                                                        input_shape=[crop_size, crop_size, 3])
+                                                        input_shape=[crop_size, crop_size, 3],
+                                                        use_imagenet=use_imagenet)
                 assert model is not None, '[ERROR] There was a problem in loading the pre-trained weights'
                 if compiled is False:
                     print('[INFO] Recompiling model using passed optimizer and loss arguments')
@@ -464,7 +472,8 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                                         loss_type=loss_to_load,
                                                         loss_fn=loss_fn,
                                                         recompile=recompile,
-                                                        input_shape=[crop_size, crop_size, 3])
+                                                        input_shape=[crop_size, crop_size, 3],
+                                                        use_imagenet=use_imagenet)
                 opt = get_optimizer(optimizer_name=optimizer,
                                     lr_schedule=lr_schedule,
                                     weight_decay=weight_decay) # Optimizer must be created within scope!
@@ -482,7 +491,8 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                                     loss_type=loss_to_load,
                                                     loss_fn=loss_fn,
                                                     recompile=recompile,
-                                                    input_shape=[crop_size, crop_size, 3])
+                                                    input_shape=[crop_size, crop_size, 3],
+                                                    use_imagenet=use_imagenet)
             assert model is not None, '[ERROR] There was a problem in loading the pre-trained weights'
             if compiled is False:
                 print('[INFO] Recompiling model using passed optimizer and loss arguments')
@@ -602,6 +612,8 @@ if __name__ == '__main__':
     parser.add_argument('--loss_to_load', type=str, default='FOCAL',
                         choices=['VANILLA', 'BATCH_HARD', 'BATCH_HARD_V2', 'FOCAL', 'ADAPTIVE', 'ASSORTED'],
                         help='Choice of triplet loss object for loading models. Default is FOCAL')
+    parser.add_argument('--use_imagenet', action='store_true',
+                        help='Use pre-trained ImageNet weights')
 
     args = vars(parser.parse_args())
 
@@ -643,4 +655,5 @@ if __name__ == '__main__':
                 recompile=args['recompile'],
                 steps_per_epoch=args['steps_per_epoch'],
                 equisample=args['equisample'],
-                loss_to_load=args['loss_to_load'])
+                loss_to_load=args['loss_to_load'],
+                use_imagenet=args['use_imagenet'])
