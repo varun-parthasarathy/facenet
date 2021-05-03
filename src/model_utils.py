@@ -81,7 +81,7 @@ def OutputLayer(embedding_size=512, name='OutputLayer'):
         inputs = Input(x_in.shape[1:])
         x = Dropout(0.3, name='top_dropout')(inputs)
         logits = Dense(embedding_size, activation=None)(x)
-        embeddings = tf.keras.layers.Lambda(lambda x: tf.math.l2_normalize(x, axis=1), dtype='float32',
+        embeddings = tf.keras.layers.Lambda(lambda k: tf.math.l2_normalize(k, axis=1), dtype='float32',
                                             name='embeddings')(logits)
         return Model(inputs=inputs, outputs=embeddings, name=name)(x_in)
     return output_layer
