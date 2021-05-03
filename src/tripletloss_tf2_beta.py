@@ -21,7 +21,7 @@ from tensorflow.keras.mixed_precision import experimental as mixed_precision
 from custom_triplet_loss import TripletBatchHardLoss, TripletFocalLoss, TripletBatchHardV2Loss, AssortedTripletLoss
 from dataset_utils import generate_training_dataset, get_test_dataset, get_LFW_dataset
 from triplet_callbacks_and_metrics import RangeTestCallback, DecayMarginCallback, TripletLossMetrics, ToggleMetricEval
-from model_utils inport create_neural_network_v2
+from model_utils import create_neural_network_v2
 
 
 def create_neural_network(model_type='resnet50', embedding_size=512, input_shape=None, weights_path='',
