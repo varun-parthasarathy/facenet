@@ -19,55 +19,56 @@ def Backbone(model_type='resnet50', use_imagenet=True):
     weights = None
     if use_imagenet is True:
         weights = 'imagenet'
+    activation = tfa.activations.mish
     def backbone(x_in):
         base_model = None
         if model_type == 'resnet50':
-            base_model = ResNet50(weights=weights, include_top=False, input_shape=x_in.shape[1:],
+            base_model = ResNet50(weights=weights, include_top=False, input_shape=x_in.shape[1:], activation=activation,
                                   pooling='avg')(x_in)
         elif model_type == 'resnet101':
-            base_model = ResNet101(weights=weights, include_top=False, input_shape=x_in.shape[1:],
+            base_model = ResNet101(weights=weights, include_top=False, input_shape=x_in.shape[1:], activation=activation,
                                    pooling='avg')(x_in)
         elif model_type == 'resnet152':
-            base_model = ResNet152(weights=weights, include_top=False, input_shape=x_in.shape[1:],
+            base_model = ResNet152(weights=weights, include_top=False, input_shape=x_in.shape[1:], activation=activation,
                                    pooling='avg')(x_in)
         elif model_type == 'inception_v3':
-            base_model = InceptionV3(weights=weights, include_top=False, input_shape=x_in.shape[1:],
+            base_model = InceptionV3(weights=weights, include_top=False, input_shape=x_in.shape[1:], activation=activation,
                                      pooling='avg')(x_in)
         elif model_type == 'efficientnet_b0':
-            base_model = EfficientNetB0(weights=weights, include_top=False, input_shape=x_in.shape[1:], activation=tfa.activations.mish,
+            base_model = EfficientNetB0(weights=weights, include_top=False, input_shape=x_in.shape[1:], activation=activation,
                                         pooling='avg')(x_in)
         elif model_type == 'efficientnet_b1':
-            base_model = EfficientNetB1(weights=weights, include_top=False, input_shape=x_in.shape[1:], activation=tfa.activations.mish,
+            base_model = EfficientNetB1(weights=weights, include_top=False, input_shape=x_in.shape[1:], activation=activation,
                                         pooling='avg')(x_in)
         elif model_type == 'efficientnet_b2':
-            base_model = EfficientNetB2(weights=weights, include_top=False, input_shape=x_in.shape[1:], activation=tfa.activations.mish,
+            base_model = EfficientNetB2(weights=weights, include_top=False, input_shape=x_in.shape[1:], activation=activation,
                                         pooling='avg')(x_in)
         elif model_type == 'efficientnet_b3':
-            base_model = EfficientNetB3(weights=weights, include_top=False, input_shape=x_in.shape[1:], activation=tfa.activations.mish,
+            base_model = EfficientNetB3(weights=weights, include_top=False, input_shape=x_in.shape[1:], activation=activation,
                                         pooling='avg')(x_in)
         elif model_type == 'efficientnet_b4':
-            base_model = EfficientNetB4(weights=weights, include_top=False, input_shape=x_in.shape[1:], activation=tfa.activations.mish,
+            base_model = EfficientNetB4(weights=weights, include_top=False, input_shape=x_in.shape[1:], activation=activation,
                                         pooling='avg')(x_in)
         elif model_type == 'efficientnet_b5':
-            base_model = EfficientNetB5(weights=weights, include_top=False, input_shape=x_in.shape[1:], activation=tfa.activations.mish,
+            base_model = EfficientNetB5(weights=weights, include_top=False, input_shape=x_in.shape[1:], activation=activation,
                                         pooling='avg')(x_in)
         elif model_type == 'efficientnet_b6':
-            base_model = EfficientNetB6(weights=weights, include_top=False, input_shape=x_in.shape[1:], activation=tfa.activations.mish,
+            base_model = EfficientNetB6(weights=weights, include_top=False, input_shape=x_in.shape[1:], activation=activation,
                                         pooling='avg')(x_in)
         elif model_type == 'efficientnet_b7':
-            base_model = EfficientNetB7(weights=weights, include_top=False, input_shape=x_in.shape[1:], activation=tfa.activations.mish,
+            base_model = EfficientNetB7(weights=weights, include_top=False, input_shape=x_in.shape[1:], activation=activation,
                                         pooling='avg')(x_in)
         elif model_type == 'inception_resnet_v2':
-            base_model = InceptionResNetV2(weights=weights, include_top=False, input_shape=x_in.shape[1:],
+            base_model = InceptionResNetV2(weights=weights, include_top=False, input_shape=x_in.shape[1:], activation=activation,
                                            pooling='avg')(x_in)
         elif model_type == 'xception':
-            base_model = Xception(weights=weights, include_top=False, input_shape=x_in.shape[1:],
+            base_model = Xception(weights=weights, include_top=False, input_shape=x_in.shape[1:], activation=activation,
                                   pooling='avg')(x_in)
         elif model_type == 'mobilenet':
-            base_model = MobileNet(weights=weights, include_top=False, input_shape=x_in.shape[1:],
+            base_model = MobileNet(weights=weights, include_top=False, input_shape=x_in.shape[1:], activation=activation,
                                    pooling='avg')(x_in)
         elif model_type == 'mobilenet_v2':
-            base_model = MobileNetV2(weights=weights, include_top=False, input_shape=x_in.shape[1:],
+            base_model = MobileNetV2(weights=weights, include_top=False, input_shape=x_in.shape[1:], activation=activation,
                                      pooling='avg')(x_in)
         else:
             pass
