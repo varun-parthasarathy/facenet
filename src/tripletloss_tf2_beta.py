@@ -160,12 +160,12 @@ def get_learning_rate_schedule(schedule_name, image_count, batch_size, learning_
     elif schedule_name == 'exponential_decay':
         lr = tf.keras.optimizers.schedules.ExponentialDecay(initial_learning_rate=learning_rate,
                                                             decay_steps=step_size,
-                                                            decay_rate=0.96,
+                                                            decay_rate=0.90,
                                                             staircase=False)
     elif schedule_name == 'staircase':
         lr = tf.keras.optimizers.schedules.ExponentialDecay(initial_learning_rate=learning_rate,
                                                             decay_steps=step_size,
-                                                            decay_rate=0.96,
+                                                            decay_rate=0.90,
                                                             staircase=True)
     elif schedule_name == 'constant':
         lr = learning_rate
