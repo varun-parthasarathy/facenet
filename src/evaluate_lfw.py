@@ -16,6 +16,8 @@ from scipy.optimize import brentq
 from sklearn.model_selection import KFold
 from adaptive_triplet_loss import AdaptiveTripletLoss
 from custom_triplet_loss import TripletBatchHardLoss, TripletFocalLoss, TripletBatchHardV2Loss, AssortedTripletLoss
+#from model_utils import create_neural_network_v2
+#import model_utils
 
 def _get_paths(lfw_dir, pairs):
     nrof_skipped_pairs = 0
@@ -260,9 +262,9 @@ def main(weights_path, lfw_path, image_size, crop_size, model_type, loss_type,
     else:
         loss_obj = None
     if loss_obj is not None:
-        model = tf.keras.models.load_model(weights_path, custom_objects={loss_obj[0]:loss_obj[1]})
+        model = tf.keras.models.load_model(weights_path, custom_objects={loss_obj[0]:loss_obj[1], 'tf':tf})
     else:
-        model = tf.keras.models.load_model(weights_path)
+        model = tf.keras.models.load_model(weights_path, custom_objects={'tf':tf})
 
     lfw_ds, nrof_images, _, actual_issame = get_LFW_dataset(data_path=lfw_path, 
                                                             image_size=image_size, 
