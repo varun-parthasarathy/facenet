@@ -23,16 +23,16 @@ def Backbone(model_type='resnet50', use_imagenet=True):
     def backbone(x_in):
         base_model = None
         if model_type == 'resnet50':
-            base_model = ResNet50(weights=weights, include_top=False, input_shape=x_in.shape[1:], activation=activation,
+            base_model = ResNet50(weights=weights, include_top=False, input_shape=x_in.shape[1:],
                                   pooling='avg')(x_in)
         elif model_type == 'resnet101':
-            base_model = ResNet101(weights=weights, include_top=False, input_shape=x_in.shape[1:], activation=activation,
+            base_model = ResNet101(weights=weights, include_top=False, input_shape=x_in.shape[1:],
                                    pooling='avg')(x_in)
         elif model_type == 'resnet152':
-            base_model = ResNet152(weights=weights, include_top=False, input_shape=x_in.shape[1:], activation=activation,
+            base_model = ResNet152(weights=weights, include_top=False, input_shape=x_in.shape[1:],
                                    pooling='avg')(x_in)
         elif model_type == 'inception_v3':
-            base_model = InceptionV3(weights=weights, include_top=False, input_shape=x_in.shape[1:], activation=activation,
+            base_model = InceptionV3(weights=weights, include_top=False, input_shape=x_in.shape[1:],
                                      pooling='avg')(x_in)
         elif model_type == 'efficientnet_b0':
             base_model = EfficientNetB0(weights=weights, include_top=False, input_shape=x_in.shape[1:], activation=activation,
@@ -59,16 +59,16 @@ def Backbone(model_type='resnet50', use_imagenet=True):
             base_model = EfficientNetB7(weights=weights, include_top=False, input_shape=x_in.shape[1:], activation=activation,
                                         pooling='avg')(x_in)
         elif model_type == 'inception_resnet_v2':
-            base_model = InceptionResNetV2(weights=weights, include_top=False, input_shape=x_in.shape[1:], activation=activation,
+            base_model = InceptionResNetV2(weights=weights, include_top=False, input_shape=x_in.shape[1:],
                                            pooling='avg')(x_in)
         elif model_type == 'xception':
-            base_model = Xception(weights=weights, include_top=False, input_shape=x_in.shape[1:], activation=activation,
+            base_model = Xception(weights=weights, include_top=False, input_shape=x_in.shape[1:],
                                   pooling='avg')(x_in)
         elif model_type == 'mobilenet':
-            base_model = MobileNet(weights=weights, include_top=False, input_shape=x_in.shape[1:], activation=activation,
+            base_model = MobileNet(weights=weights, include_top=False, input_shape=x_in.shape[1:],
                                    pooling='avg')(x_in)
         elif model_type == 'mobilenet_v2':
-            base_model = MobileNetV2(weights=weights, include_top=False, input_shape=x_in.shape[1:], activation=activation,
+            base_model = MobileNetV2(weights=weights, include_top=False, input_shape=x_in.shape[1:],
                                      pooling='avg')(x_in)
         else:
             pass
