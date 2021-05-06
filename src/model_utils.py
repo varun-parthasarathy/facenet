@@ -134,9 +134,9 @@ def create_neural_network_v2(model_type='resnet50', embedding_size=512, input_sh
                 else:
                     loss_obj = None
                 if loss_obj is not None:
-                    model = tf.keras.models.load_model(weights_path, custom_objects={loss_obj[0]:loss_obj[1]})
+                    model = tf.keras.models.load_model(weights_path, custom_objects={loss_obj[0]:loss_obj[1]}, compile=False)
                 else:
-                    model = tf.keras.models.load_model(weights_path)
+                    model = tf.keras.models.load_model(weights_path, compile=False)
                 compiled = False
                 print('[WARNING] Model will be compiled again. If you wish to start from a previously saved optimizer state, this is not recommended')
             else:
