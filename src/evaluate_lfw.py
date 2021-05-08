@@ -115,7 +115,7 @@ def get_LFW_dataset(data_path, image_size, batch_size, crop_size, train_classes=
 
     def decode_img(img):
         #img = tf.io.decode_image(img, channels=3, expand_animations=False)
-        img = tf.io.decode_png(img)
+        img = tf.io.decode_png(img, channels=3)
         if use_mixed_precision is True:
             if use_tpu is True:
                 img = tf.cast(img, tf.bfloat16)
