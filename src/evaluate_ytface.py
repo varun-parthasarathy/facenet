@@ -16,53 +16,36 @@ from scipy.optimize import brentq
 from sklearn.model_selection import KFold
 from adaptive_triplet_loss import AdaptiveTripletLoss
 from custom_triplet_loss import TripletBatchHardLoss, TripletFocalLoss, TripletBatchHardV2Loss, AssortedTripletLoss
-#from model_utils import create_neural_network_v2
-#import model_utils
 
-def _get_paths(lfw_dir, pairs):
-    nrof_skipped_pairs = 0
-    path_list = []
-    issame_list = []
-    classes = set()
-    for pair in pairs:
-        if len(pair) == 3:
-            path0 = _add_extension(os.path.join(lfw_dir, pair[0], pair[0] + '_' + '%04d' % int(pair[1])))
-            path1 = _add_extension(os.path.join(lfw_dir, pair[0], pair[0] + '_' + '%04d' % int(pair[2])))
-            issame = True
-            classes.add(pair[0])
-        elif len(pair) == 4:
-            path0 = _add_extension(os.path.join(lfw_dir, pair[0], pair[0] + '_' + '%04d' % int(pair[1])))
-            path1 = _add_extension(os.path.join(lfw_dir, pair[2], pair[2] + '_' + '%04d' % int(pair[3])))
-            issame = False
-            classes.add(pair[0])
-            classes.add(pair[2])
-        if os.path.exists(path0) and os.path.exists(path1):    # Only add the pair if both paths exist
-            #path_list += (path0,path1)
-            path_list.append(path0)
-            path_list.append(path1)
-            issame_list.append(issame)
-        else:
-            nrof_skipped_pairs += 1
-    if nrof_skipped_pairs>0:
-        print('[INFO] Skipped %d image pairs' % nrof_skipped_pairs)
-    
-    return path_list, issame_list, list(classes)
-  
-def _add_extension(path):
-    if os.path.exists(path+'.jpg'):
-        return path+'.jpg'
-    elif os.path.exists(path+'.png'):
-        return path+'.png'
-    else:
-        raise RuntimeError('No file "%s" with extension png or jpg.' % path)
 
-def _read_pairs(pairs_filename):
+def _read_pairs(pairs_filename, lfw_path):
     pairs = []
+    actual_issame = []
     with open(pairs_filename, 'r') as f:
         for line in f.readlines()[1:]:
-            pair = line.strip().split(', ')
+            pair = line.strip().split(',')
+            for i in range(len(pair)):
+                pair[i] = pair[i].strip()
+
+            if not os.path.exists(os.path.join(lfw_path, pair[2])):
+                continue
+            if not os.path.exists(os.path.join(lfw_path, pair[3])):
+                continue
+            if not os.path.isdir(os.path.join(lfw_path, pair[2])):
+                continue
+            if not os.path.isdir(os.path.join(lfw_path, pair[3])):
+                continue
+            if len(os.listdir(os.path.join(lfw_path, pair[2]))) == 0:
+                continue
+            if len(os.listdir(os.path.join(lfw_path, pair[3]))) == 0:
+                continue
+
+            if int(pair[-2]) == 1:
+                actual_issame.append(True)
+            else:
+                actual_issame.append(False)
             pairs.append(pair)
-    return np.array(pairs)
+    return np.array(pairs), np.array(actual_issame), len(pairs)
 
 def _get_preprocessor(model_type):
     if 'inception_resnet_v2' in model_type:
@@ -95,23 +78,14 @@ def _get_preprocessor(model_type):
 
     return preprocessor
 
-def get_LFW_dataset(data_path, image_size, batch_size, crop_size, train_classes=0,
-                    use_mixed_precision=False, use_tpu=False, model_type=None):
+def get_dataset(data_path, image_size, batch_size, crop_size, train_classes=0,
+                use_mixed_precision=False, use_tpu=False, model_type=None):
     AUTOTUNE = tf.data.experimental.AUTOTUNE
-    assert batch_size % 2 == 0, '[ERROR] Batch size must be a multiple of 2'
-    pairs = _read_pairs('./data/ytface_pairs.txt')
-    path_list, actual_issame, CLASS_NAMES = _get_paths(data_path, pairs)
-    CLASS_NAMES.sort()
-    CLASS_NAMES = np.array(CLASS_NAMES)
-    image_count = len(path_list)
-    assert image_count % batch_size == 0, '[ERROR] Batch size must perfectly divide number of images'
+    data_path = pathlib.Path(data_path)
+    image_count = len(list(data_path.glob('*.png')))
     preprocessor = _get_preprocessor(model_type)
 
-    ds = tf.data.Dataset.from_tensor_slices(path_list)
-
-    def get_label(file_path):
-        parts = tf.strings.split(file_path, os.path.sep)
-        return tf.argmax(parts[-2] == CLASS_NAMES) + train_classes
+    ds = tf.data.Dataset.list_files(str(data_path/"*.png"), shuffle=True)
 
     def decode_img(img):
         #img = tf.io.decode_image(img, channels=3, expand_animations=False)
@@ -127,22 +101,20 @@ def get_LFW_dataset(data_path, image_size, batch_size, crop_size, train_classes=
         return img
 
     def process_path(file_path):
-        label = get_label(file_path)
         img = tf.io.read_file(file_path)
         img = decode_img(img)
         if preprocessor is not None:
             img = preprocessor.preprocess_input(img)
         else:
             img = img / 255.
-        #img = tf.image.random_crop(img, [crop_size, crop_size, 3])
-        #img = tf.image.random_flip_left_right(img)
-        return img, label
+
+        return img
 
     ds = ds.map(process_path, num_parallel_calls=AUTOTUNE, deterministic=True)
     ds = ds.batch(batch_size)
     ds = ds.prefetch(AUTOTUNE)
 
-    return ds, image_count, len(CLASS_NAMES), actual_issame
+    return ds, image_count
 
 def _distance(embeddings1, embeddings2, distance_metric=0):
     if distance_metric==0:
@@ -266,52 +238,66 @@ def main(weights_path, lfw_path, image_size, crop_size, model_type, loss_type,
     else:
         model = tf.keras.models.load_model(weights_path, custom_objects={'tf':tf})
 
-    lfw_ds, nrof_images, _, actual_issame = get_LFW_dataset(data_path=lfw_path, 
-                                                            image_size=image_size, 
-                                                            batch_size=batch_size,
-                                                            crop_size=crop_size,
-                                                            use_mixed_precision=use_mixed_precision,
-                                                            use_tpu=use_tpu,
-                                                            train_classes=0,
-                                                            model_type=model_type)
-
-    actual_issame = np.asarray(actual_issame)
-    embeddings = np.zeros((nrof_images, embedding_size))
-    labels = np.zeros((nrof_images,))
-    start_idx = 0
-    print('[INFO] There are %d images to process in the dataset' % (nrof_images))
+    pairs, actual_issame, nrof_pairs = _read_pairs('./data/ytface_pairs.txt', lfw_path)
+    embeddings = np.zeros((nrof_pairs*2, embedding_size))
 
     if load_from_file is None or load_from_file is False:
-        for i, (xs, ys) in enumerate(lfw_ds):
-            print('Processing batch : %d of %d' % (i+1, int(nrof_images / batch_size)), flush=True)
-            embs = model.predict(xs)
-            end_idx = start_idx + np.squeeze(embs).shape[0]
-            labels[start_idx:end_idx] = np.squeeze(ys)
-            embeddings[start_idx:end_idx] = np.squeeze(embs)
-            start_idx = end_idx
-        np.save('./embeddings.npy', embeddings)
-        np.save('./labels.npy', labels)
+        for pair_num, pair in enumerate(pairs):
+            temp_emb = None
+            x_ds, ic = get_dataset(data_path=os.path.join(lfw_path, pair[2]), 
+                                   image_size=image_size,
+                                   batch_size=batch_size,
+                                   crop_size=crop_size,
+                                   use_mixed_precision=use_mixed_precision,
+                                   use_tpu=use_tpu,
+                                   train_classes=0,
+                                   model_type=model_type)
+            for i, xs in enumerate(x_ds):
+                embs = model.predict(xs)
+                embs = np.squeeze(embs)
+                if temp_emb is None:
+                    temp_emb = embs
+                else:
+                    temp_emb = np.vstack((temp_emb, embs))
+
+            assert temp_emb.shape == (ic, embedding_size)
+            
+            mean_emb = np.squeeze(np.mean(temp_emb, axis=1))
+            assert mean_emb.shape[1] == embedding_size
+            embeddings[2*pair_num] = mean_emb
+
+            temp_emb = None
+            x_ds, ic = get_dataset(data_path=os.path.join(lfw_path, pair[3]), 
+                                   image_size=image_size,
+                                   batch_size=batch_size,
+                                   crop_size=crop_size,
+                                   use_mixed_precision=use_mixed_precision,
+                                   use_tpu=use_tpu,
+                                   train_classes=0,
+                                   model_type=model_type)
+            for i, xs in enumerate(x_ds):
+                embs = model.predict(xs)
+                embs = np.squeeze(embs)
+                if temp_emb is None:
+                    temp_emb = embs
+                else:
+                    temp_emb = np.vstack((temp_emb, embs))
+
+            assert temp_emb.shape == (ic, embedding_size)
+            
+            mean_emb = np.squeeze(np.mean(temp_emb, axis=1))
+            assert mean_emb.shape[1] == embedding_size
+            embeddings[(2*pair_num) + 1] = mean_emb
+
+        np.save('./ytface_embeddings.npy', embeddings)
     else:
         embeddings = np.load('./embeddings.npy')
-        labels = np.load('./labels.npy')
 
     result_string = 'Accuracy : {}%+-{}% :: Validation rate : {}%+-{}% @FAR : {} :: AUC : {} :: EER : {}'
     thresholds = np.arange(0, 2, 0.01)
     y_pred = embeddings
     embeddings1 = y_pred[0::2]
     embeddings2 = y_pred[1::2]
-    y_true = labels
-    issame = np.equal(y_true[0::2], y_true[1::2])
-
-    if np.all(actual_issame == issame) is False:
-        count = 0
-        for i in range(len(actual_issame)):
-            if actual_issame[i] != issame[i]:
-                count += 1
-                print('%d : ' % (i+1), end='')
-                print(actual_issame[i] + ' ' + issame[i])
-        print('[ERROR] %d mismatches in labels!' % (count))
-        raise AssertionError('[ERROR] There was a problem in creating the dataset. Please check the labels')
 
     tpr, fpr, accuracy, acc_std = _calculate_roc(thresholds, embeddings1, embeddings2,
                                                  actual_issame, nrof_folds=10, distance_metric=0)
