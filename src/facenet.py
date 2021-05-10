@@ -31,6 +31,7 @@ import os
 from subprocess import Popen, PIPE
 import tensorflow as tf
 import numpy as np
+import pathlib
 from scipy import misc
 from sklearn.model_selection import KFold
 from scipy import interpolate
@@ -333,8 +334,13 @@ def get_dataset(path, has_class_directories=True):
 def get_image_paths(facedir):
     image_paths = []
     if os.path.isdir(facedir):
-        images = os.listdir(facedir)
-        image_paths = [os.path.join(facedir,img) for img in images]
+        path = pathlib.Path(facedir)
+        t1 = [str(img) for img in path.glob('*.png')]
+        t2 = [str(img) for img in path.glob('*/*.png')]
+        t3 = [str(img) for img in path.glob('*.jpg')]
+        t4 = [str(img) for img in path.glob('*/*.jpg')]
+        image_paths = t1 + t2 + t3 + t4
+
     return image_paths
   
 def split_dataset(dataset, split_ratio, min_nrof_images_per_class, mode):

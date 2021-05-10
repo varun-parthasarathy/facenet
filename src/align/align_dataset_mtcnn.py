@@ -76,10 +76,19 @@ def main(args):
                     random.shuffle(cls.image_paths)
             for image_path in cls.image_paths:
                 nrof_images_total += 1
-                filename = os.path.splitext(os.path.split(image_path)[1])[0]
-                output_filename = os.path.join(output_class_dir, filename+'.png')
+                if os.sep in image_path:
+                    filename = os.path.splitext(os.path.split(image_path)[1])[0]
+                    file_folder = os.path.split(os.path.dirname(image_path))[1]
+                    output_filename = os.path.join(output_class_dir, file_folder, filename+'.png')
+                else:
+                    filename = os.path.splitext(os.path.split(image_path)[1])[0]
+                    output_filename = os.path.join(output_class_dir, filename+'.png')
                 print(image_path)
                 if not os.path.exists(output_filename):
+                    if os.sep in image_path:
+                        req_dirs = os.path.dirname(output_filename)
+                        if not os.path.exists(req_dirs):
+                            os.makedirs(req_dirs)
                     try:
                         img = np.array(Image.open(image_path))
                     except (IOError, ValueError, IndexError) as e:
