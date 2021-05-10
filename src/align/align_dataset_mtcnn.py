@@ -28,6 +28,7 @@ from __future__ import print_function
 from scipy import misc
 import sys
 import os
+import re
 import argparse
 import tensorflow as tf
 import numpy as np
@@ -76,7 +77,7 @@ def main(args):
                     random.shuffle(cls.image_paths)
             for image_path in cls.image_paths:
                 nrof_images_total += 1
-                if os.sep in image_path:
+                if args.video_input:
                     filename = os.path.splitext(os.path.split(image_path)[1])[0]
                     file_folder = os.path.split(os.path.dirname(image_path))[1]
                     output_filename = os.path.join(output_class_dir, file_folder, filename+'.png')
@@ -164,6 +165,8 @@ def parse_arguments(argv):
         help='Upper bound on the amount of GPU memory that will be used by the process.', default=1.0)
     parser.add_argument('--detect_multiple_faces', type=bool,
                         help='Detect and align multiple faces per image.', default=False)
+    parser.add_argument('--video_input', type=bool,
+                        help='If each class has multiple sub-directories at the next level, use this flag', default=False)
     return parser.parse_args(argv)
 
 if __name__ == '__main__':

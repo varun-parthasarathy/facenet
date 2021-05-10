@@ -335,11 +335,9 @@ def get_image_paths(facedir):
     image_paths = []
     if os.path.isdir(facedir):
         path = pathlib.Path(facedir)
-        t1 = [str(img) for img in path.glob('*.png')]
-        t2 = [str(img) for img in path.glob('*/*.png')]
-        t3 = [str(img) for img in path.glob('*.jpg')]
-        t4 = [str(img) for img in path.glob('*/*.jpg')]
-        image_paths = t1 + t2 + t3 + t4
+        t1 = [str(img) for img in path.glob('**/*.png')]
+        t2 = [str(img) for img in path.glob('**/*.jpg')]
+        image_paths = t1 + t2
 
     return image_paths
   
