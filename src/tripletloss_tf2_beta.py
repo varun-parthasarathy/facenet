@@ -144,14 +144,14 @@ def create_neural_network(model_type='resnet50', embedding_size=512, input_shape
     
     return model, compiled
 
-def get_learning_rate_schedule(schedule_name, image_count, batch_size, learning_rate=1e-3, max_lr=0.5,
-                               step_size=6000):
+def get_learning_rate_schedule(schedule_name, image_count, batch_size, learning_rate=1e-3, max_lr=0.25,
+                               step_size=30000):
     lr = None
     if schedule_name == 'triangular2':
         lr = tfa.optimizers.Triangular2CyclicalLearningRate(initial_learning_rate=learning_rate,
-                                                           maximal_learning_rate=max_lr,
-                                                           step_size=step_size,
-                                                           scale_mode='iterations')
+                                                            maximal_learning_rate=max_lr,
+                                                            step_size=step_size,
+                                                            scale_mode='iterations')
     elif schedule_name == 'triangular':
         lr = tfa.optimizers.TriangularCyclicalLearningRate(initial_learning_rate=learning_rate,
                                                            maximal_learning_rate=max_lr,
@@ -169,6 +169,12 @@ def get_learning_rate_schedule(schedule_name, image_count, batch_size, learning_
                                                             staircase=True)
     elif schedule_name == 'constant':
         lr = learning_rate
+    elif schedule_name == 'cosine_restart':
+        lr = tf.keras.optimizers.schedules.CosineDecayRestarts(initial_learning_rate=max_lr,
+                                                               first_decay_steps=step_size,
+                                                               t_mul=1.0, # Can be 2.0 as well, but 1.0 works just fine
+                                                               m_mul=0.90, # Decay the starting lr for each restart
+                                                               alpha=learning_rate)
     else:
         pass
 
@@ -533,12 +539,12 @@ if __name__ == '__main__':
     parser.add_argument('-c', '--crop_size', required=False, type=int, default=224,
                         help='Image size after random crop is applied')
     parser.add_argument('--lr_schedule', required=False, type=str, default='triangular2',
-                        choices=['triangular2', 'triangular', 'staircase', 'exponential_decay', 'constant'],
+                        choices=['triangular2', 'triangular', 'staircase', 'exponential_decay', 'constant', 'cosine_restart'],
                         help='Choice of learning rate schedule. Default is a cyclic policy')
     parser.add_argument('--init_lr', required=False, type=float, default=0.001,
-                        help='Initial learning rate')
-    parser.add_argument('--max_lr', required=False, type=float, default=0.5,
-                        help='Maximum learning rate. Should be set when using cyclic LR policies only')
+                        help='Initial learning rate. For cosine restarts, specifies lowest value of learning rate')
+    parser.add_argument('--max_lr', required=False, type=float, default=0.25,
+                        help='Maximum learning rate. Should be set when using cyclic LR or cosine restart policies only')
     parser.add_argument('--weight_decay', required=False, type=float, default=0.000001,
                         help='Weight decay coefficient for regularization. Default value is 1e-6')
     parser.add_argument('--optimizer', required=False, default='RMSPROP',
