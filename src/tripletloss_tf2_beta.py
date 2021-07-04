@@ -169,12 +169,12 @@ def get_learning_rate_schedule(schedule_name, image_count, batch_size, learning_
                                                             staircase=True)
     elif schedule_name == 'constant':
         lr = learning_rate
-    elif schedule_name == 'cosine_restart':
+    '''elif schedule_name == 'cosine_restart':
         lr = tf.keras.optimizers.schedules.CosineDecayRestarts(initial_learning_rate=max_lr,
                                                                first_decay_steps=step_size,
                                                                t_mul=1.0, # Can be 2.0 as well, but 1.0 works just fine
                                                                m_mul=0.90, # Decay the starting lr for each restart
-                                                               alpha=learning_rate)
+                                                               alpha=learning_rate)'''
     else:
         pass
 
