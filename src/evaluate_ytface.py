@@ -266,7 +266,7 @@ def main(weights_path, lfw_path, image_size, crop_size, model_type, loss_type,
 
             assert temp_emb.shape == (ic, embedding_size)
             
-            mean_emb = np.squeeze(np.mean(temp_emb, axis=1))
+            mean_emb = np.squeeze(np.mean(temp_emb, axis=0))
             #assert mean_emb.shape[1] == embedding_size
             embeddings[2*pair_num] = mean_emb
 
@@ -289,7 +289,7 @@ def main(weights_path, lfw_path, image_size, crop_size, model_type, loss_type,
 
             assert temp_emb.shape == (ic, embedding_size)
             
-            mean_emb = np.squeeze(np.mean(temp_emb, axis=1))
+            mean_emb = np.squeeze(np.mean(temp_emb, axis=0))
             #assert mean_emb.shape[1] == embedding_size
             embeddings[(2*pair_num) + 1] = mean_emb
 
