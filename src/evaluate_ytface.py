@@ -247,7 +247,7 @@ def main(weights_path, lfw_path, image_size, crop_size, model_type, loss_type,
     embeddings = np.zeros((nrof_pairs*2, embedding_size))
 
     if load_from_file is None or load_from_file is False:
-        for pair_num, pair in enumerate(tqdm(pairs)):
+        for pair_num, pair in enumerate(tqdm(pairs, file=sys.stdout)):
             temp_emb = None
             x_ds, ic = get_dataset(data_path=os.path.join(lfw_path, pair[2]), 
                                    image_size=image_size,

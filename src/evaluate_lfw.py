@@ -285,7 +285,7 @@ def main(weights_path, lfw_path, image_size, crop_size, model_type, loss_type,
     print('[INFO] There are %d images to process in the dataset' % (nrof_images))
 
     if load_from_file is None or load_from_file is False:
-        with tqdm(total=int(nrof_images / batch_size)) as pbar:
+        with tqdm(total=int(nrof_images / batch_size), file=sys.stdout) as pbar:
             for i, (xs, ys) in enumerate(lfw_ds):
                 #print('Processing batch : %d of %d' % (i+1, int(nrof_images / batch_size)), flush=True)
                 embs = model.predict(xs)
