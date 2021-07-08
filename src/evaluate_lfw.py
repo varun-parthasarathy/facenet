@@ -8,6 +8,7 @@ import math
 import argparse
 import importlib
 import numpy as np
+from tqdm import tqdm
 from scipy import misc
 import tensorflow as tf
 from sklearn import metrics
@@ -284,15 +285,17 @@ def main(weights_path, lfw_path, image_size, crop_size, model_type, loss_type,
     print('[INFO] There are %d images to process in the dataset' % (nrof_images))
 
     if load_from_file is None or load_from_file is False:
-        for i, (xs, ys) in enumerate(lfw_ds):
-            print('Processing batch : %d of %d' % (i+1, int(nrof_images / batch_size)), flush=True)
-            embs = model.predict(xs)
-            end_idx = start_idx + np.squeeze(embs).shape[0]
-            labels[start_idx:end_idx] = np.squeeze(ys)
-            embeddings[start_idx:end_idx] = np.squeeze(embs)
-            start_idx = end_idx
-        np.save('./embeddings.npy', embeddings)
-        np.save('./labels.npy', labels)
+        with tqdm(total=int(nrof_images / batch_size)) as pbar:
+            for i, (xs, ys) in enumerate(lfw_ds):
+                #print('Processing batch : %d of %d' % (i+1, int(nrof_images / batch_size)), flush=True)
+                embs = model.predict(xs)
+                end_idx = start_idx + np.squeeze(embs).shape[0]
+                labels[start_idx:end_idx] = np.squeeze(ys)
+                embeddings[start_idx:end_idx] = np.squeeze(embs)
+                start_idx = end_idx
+                pbar.update(1)
+            np.save('./embeddings.npy', embeddings)
+            np.save('./labels.npy', labels)
     else:
         embeddings = np.load('./embeddings.npy')
         labels = np.load('./labels.npy')

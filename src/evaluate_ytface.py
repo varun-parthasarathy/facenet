@@ -9,6 +9,7 @@ import pathlib
 import argparse
 import importlib
 import numpy as np
+from tqdm import tqdm
 from scipy import misc
 import tensorflow as tf
 from sklearn import metrics
@@ -246,7 +247,7 @@ def main(weights_path, lfw_path, image_size, crop_size, model_type, loss_type,
     embeddings = np.zeros((nrof_pairs*2, embedding_size))
 
     if load_from_file is None or load_from_file is False:
-        for pair_num, pair in enumerate(pairs):
+        for pair_num, pair in enumerate(tqdm(pairs)):
             temp_emb = None
             x_ds, ic = get_dataset(data_path=os.path.join(lfw_path, pair[2]), 
                                    image_size=image_size,
