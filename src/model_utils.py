@@ -2,6 +2,7 @@ import os
 import tensorflow as tf
 import tensorflow_addons as tfa
 from tensorflow.keras.models import Model
+from models.efficientnetv2 import effnetv2_model
 from tensorflow.keras.layers import Input, Dense, Dropout
 from tensorflow.keras.applications.resnet import *
 from adaptive_triplet_loss import AdaptiveTripletLoss
@@ -108,11 +109,30 @@ def create_neural_network_v2(model_type='resnet50', embedding_size=512, input_sh
         right out. Once the number three, being the third number, be reached, then createst thou 
         thy input layer, which having a 3-dimensional shape, shall serve you well."
     '''
-    inputs = Input(input_shape, name='image_input')
-    backbone = Backbone(model_type=model_type, use_imagenet=use_imagenet)(inputs)
-    embeddings = OutputLayer(embedding_size=embedding_size, model_type=model_type)(backbone)
+    model = None
+    if 'efficientnetv2' in model_type:
+        if use_imagenet is True:
+            weights = 'imagenet21k-ft1k'
+            #weights = 'imagenet21k'
+            #weights = 'imagenet'
+        else:
+            weights = None
+
+        model = tf.keras.models.Sequential([
+                    tf.keras.layers.InputLayer(input_shape=input_shape),
+                    effnetv2_model.get_model(model_type, include_top=False, weights=weights),
+                    tf.keras.layers.Dropout(rate=0.3),
+                    tf.keras.layers.Dense(embedding_size, activation=None, name='logits'),
+                    tf.keras.layers.Lambda(lambda k: tf.math.l2_normalize(k, axis=1), dtype='float32',
+                                           name='embeddings')
+                ])
+    else:
+        inputs = Input(input_shape, name='image_input')
+        backbone = Backbone(model_type=model_type, use_imagenet=use_imagenet)(inputs)
+        embeddings = OutputLayer(embedding_size=embedding_size, model_type=model_type)(backbone)
+        model = Model(inputs=inputs, outputs=embeddings)
     
-    model = Model(inputs=inputs, outputs=embeddings)
+    assert model is not None, '[ERROR] Could not create model!'
     model.summary()
     compiled = False
 
