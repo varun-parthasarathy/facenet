@@ -116,10 +116,11 @@ efficientnetv1_params = {
 }
 
 
-def efficientnetv1_config(model_name='efficientnet-b0'):
+def efficientnetv1_config(model_name='efficientnet-b0', input_size=224):
   """EfficientNetV1 model config."""
   width_coefficient, depth_coefficient, isize, dropout_rate = (
       efficientnetv1_params[model_name])
+  isize = input_size
 
   cfg = hparams.Config(
       model=dict(
@@ -211,10 +212,11 @@ efficientnetv2_params = {
 }
 
 
-def efficientnetv2_config(model_name='efficientnetv2-s'):
+def efficientnetv2_config(model_name='efficientnetv2-s', input_size=224):
   """EfficientNetV2 model config."""
   block, width, depth, train_size, eval_size, dropout, randaug, mix, aug = (
       efficientnetv2_params[model_name])
+  train_size = input_size
 
   cfg = hparams.Config(
       model=dict(
@@ -232,10 +234,10 @@ def efficientnetv2_config(model_name='efficientnetv2-s'):
 
 
 ################################################################################
-def get_model_config(model_name: str):
+def get_model_config(model_name: str, input_size: int):
   """Main entry for model name to config."""
   if model_name.startswith('efficientnet-'):
-    return efficientnetv1_config(model_name)
+    return efficientnetv1_config(model_name, input_size)
   if model_name.startswith('efficientnetv2-'):
-    return efficientnetv2_config(model_name)
+    return efficientnetv2_config(model_name, input_size)
   raise ValueError(f'Unknown model_name {model_name}')

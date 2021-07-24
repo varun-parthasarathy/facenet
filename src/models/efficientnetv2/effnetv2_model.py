@@ -504,6 +504,7 @@ class EffNetV2Model(tf.keras.Model):
                model_name='efficientnetv2-s',
                model_config=None,
                include_top=True,
+               input_size=224,
                name=None):
     """Initializes an `Model` instance.
 
@@ -519,7 +520,7 @@ class EffNetV2Model(tf.keras.Model):
     super().__init__(name=name or model_name)
     cfg = copy.deepcopy(hparams.base_config)
     if model_name:
-      cfg.override(effnetv2_configs.get_model_config(model_name))
+      cfg.override(effnetv2_configs.get_model_config(model_name, input_size))
     cfg.model.override(model_config)
     self.cfg = cfg
     self._mconfig = cfg.model
@@ -657,6 +658,7 @@ def get_model(model_name,
               weights='imagenet',
               training=True,
               with_endpoints=False,
+              input_size=224,
               **kwargs):
   """Get a EfficientNet V1 or V2 model instance.
 
@@ -679,7 +681,7 @@ def get_model(model_name,
   Returns:
     A single tensor if with_endpoints if False; otherwise, a list of tensor.
   """
-  net = EffNetV2Model(model_name, model_config, include_top, **kwargs)
+  net = EffNetV2Model(model_name, model_config, include_top, input_size=input_size, **kwargs)
   net(tf.keras.Input(shape=(None, None, 3)),
       training=training,
       with_endpoints=with_endpoints)

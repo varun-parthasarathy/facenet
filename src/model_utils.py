@@ -102,12 +102,12 @@ def create_neural_network_v2(model_type='resnet50', embedding_size=512, input_sh
         It makes things more fun to read.
 
         And then the Lord spake, saying:
-        "First, shalt thou take out the model's top layer. Then shalt thou count to three.
-        No more, no less. Then shalt thou count to three, no more, no less. Three shall be the
-        number thou shalt count, and the number of the counting shall be three. Four shalt thou 
-        not count, neither count thou two, excepting that thou then proceed to three. Five is 
-        right out. Once the number three, being the third number, be reached, then createst thou 
-        thy input layer, which having a 3-dimensional shape, shall serve you well."
+        "First, shalt thou take out the model's top layer. Then shalt thou count to three, 
+        no more, no less. Three shall be the number thou shalt count, and the number of the 
+        counting shall be three. Four shalt thou not count, neither count thou two, excepting 
+        that thou then proceed to three. Five is right out. Once the number three, being the 
+        third number, be reached, then createst thou thy input layer, which having a 3-dimensional 
+        shape, shall serve you well."
     '''
     model = None
     if 'efficientnetv2' in model_type:
@@ -120,7 +120,7 @@ def create_neural_network_v2(model_type='resnet50', embedding_size=512, input_sh
 
         model = tf.keras.models.Sequential([
                     tf.keras.layers.InputLayer(input_shape=input_shape),
-                    effnetv2_model.get_model(model_type, include_top=False, weights=weights),
+                    effnetv2_model.get_model(model_type, include_top=False, weights=weights, input_size=input_shape[0]),
                     tf.keras.layers.Dropout(rate=0.3),
                     tf.keras.layers.Dense(embedding_size, activation=None, name='logits'),
                     tf.keras.layers.Lambda(lambda k: tf.math.l2_normalize(k, axis=1), dtype='float32',
