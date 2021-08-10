@@ -165,6 +165,10 @@ def generate_training_dataset(data_path, image_size, batch_size, crop_size, cach
         ds = ds.shuffle(images_per_person * people_per_sample)
         ds = ds.map(process_path, num_parallel_calls=AUTOTUNE, deterministic=True)
         ds = ds.batch(batch_size).shuffle(512, reshuffle_each_iteration=True)
+        #ds = ds.map(lambda x: tf.random.shuffle(x), num_parallel_calls=AUTOTUNE) # Useful for ConstellationLoss
+        # The above line of code should not be absolutely necessary, since we are performing a shuffle
+        # before this which should in theory ensure that the images within a batch are shuffled. However,
+        # I am leaving it in as a comment just in case.
         ds = ds.prefetch(AUTOTUNE)
 
     return ds, image_count, len(CLASS_NAMES)

@@ -18,7 +18,7 @@ from tensorflow.keras.applications.mobilenet_v2 import MobileNetV2
 from tensorflow.keras.applications.inception_v3 import InceptionV3
 from tensorflow.keras.applications.inception_resnet_v2 import InceptionResNetV2
 from tensorflow.keras.mixed_precision import experimental as mixed_precision
-from custom_triplet_loss import TripletBatchHardLoss, TripletFocalLoss, TripletBatchHardV2Loss, AssortedTripletLoss
+from custom_triplet_loss import TripletBatchHardLoss, TripletFocalLoss, TripletBatchHardV2Loss, AssortedTripletLoss, ConstellationLoss
 from dataset_utils import generate_training_dataset, get_test_dataset, get_LFW_dataset
 from triplet_callbacks_and_metrics import RangeTestCallback, DecayMarginCallback, TripletLossMetrics, ToggleMetricEval
 from model_utils import create_neural_network_v2
@@ -99,6 +99,8 @@ def create_neural_network(model_type='resnet50', embedding_size=512, input_shape
                     loss_obj = ['TripletBatchHardV2Loss', TripletBatchHardV2Loss]
                 elif loss_type == 'ASSORTED':
                     loss_obj = ['AssortedTripletLoss', AssortedTripletLoss]
+                elif loss_type == 'CONSTELLATION':
+                    loss_obj = ['ConstellationLoss', ConstellationLoss]
                 else:
                     loss_obj = None
                 if loss_obj is not None:
@@ -118,6 +120,8 @@ def create_neural_network(model_type='resnet50', embedding_size=512, input_shape
                     loss_obj = ['TripletBatchHardV2Loss', loss_fn]
                 elif loss_type == 'ASSORTED':
                     loss_obj = ['AssortedTripletLoss', loss_fn]
+                elif loss_type == 'CONSTELLATION':
+                    loss_obj = ['ConstellationLoss', ConstellationLoss]
                 else:
                     loss_obj = None
                 if loss_obj is not None:
@@ -335,6 +339,9 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                       sigma=sigma,
                                       distance_metric=distance_metric)
         print('[INFO] Using assorted triplet loss')
+    elif triplet_strategy == 'CONSTELLATION':
+        loss_fn = ConstellationLoss(k=int(margin) if margin > 1 else 4,
+                                    batch_size=batch_size)
     else:
         loss_fn = TripletFocalLoss(margin=margin,
                                    sigma=sigma,
@@ -566,7 +573,7 @@ if __name__ == '__main__':
     parser.add_argument('--epochs', required=False, type=int, default=100,
                         help='Number of epochs to train for')
     parser.add_argument('--margin', required=False, type=float, default=0.2,
-                        help='Margin to use for triplet semi-hard loss')
+                        help='Margin to use for triplet loss. Specifies k for ConstellationLoss if margin > 1, but must be an int in this case')
     parser.add_argument('--checkpoint_path', required=False, type=str, default='./checkpoints',
                         help='Path to folder in which checkpoints are to be saved')
     parser.add_argument('--range_test', action='store_true',
@@ -580,7 +587,7 @@ if __name__ == '__main__':
     parser.add_argument('--use_mixed_precision', action='store_true',
                         help='Use mixed precision for training. Can greatly reduce memory consumption')
     parser.add_argument('--triplet_strategy', type=str, default='FOCAL',
-                        choices=['VANILLA', 'BATCH_HARD', 'BATCH_HARD_V2', 'FOCAL', 'ADAPTIVE', 'ASSORTED'],
+                        choices=['VANILLA', 'BATCH_HARD', 'BATCH_HARD_V2', 'FOCAL', 'ADAPTIVE', 'ASSORTED', 'CONSTELLATION'],
                         help='Choice of triplet loss formulation. Default is FOCAL')
     parser.add_argument('--images_per_person', required=False, type=int, default=35,
                         help='Average number of images per class. Default is 35 (from MS1M cleaned + AsianCeleb)')
