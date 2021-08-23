@@ -13,7 +13,7 @@ from tensorflow.keras.applications.mobilenet_v2 import MobileNetV2
 from tensorflow.keras.applications.inception_v3 import InceptionV3
 from tensorflow.keras.applications.inception_resnet_v2 import InceptionResNetV2
 from tensorflow.keras.mixed_precision import experimental as mixed_precision
-from custom_triplet_loss import TripletBatchHardLoss, TripletFocalLoss, TripletBatchHardV2Loss, AssortedTripletLoss
+from custom_triplet_loss import TripletBatchHardLoss, TripletFocalLoss, TripletBatchHardV2Loss, AssortedTripletLoss, ConstellationLoss
 
 
 def Backbone(model_type='resnet50', use_imagenet=True):
@@ -151,6 +151,8 @@ def create_neural_network_v2(model_type='resnet50', embedding_size=512, input_sh
                     loss_obj = ['TripletBatchHardV2Loss', TripletBatchHardV2Loss]
                 elif loss_type == 'ASSORTED':
                     loss_obj = ['AssortedTripletLoss', AssortedTripletLoss]
+                elif loss_type == 'CONSTELLATION':
+                    loss_obj = ['ConstellationLoss', ConstellationLoss]
                 else:
                     loss_obj = None
                 if loss_obj is not None:
@@ -170,6 +172,8 @@ def create_neural_network_v2(model_type='resnet50', embedding_size=512, input_sh
                     loss_obj = ['TripletBatchHardV2Loss', loss_fn]
                 elif loss_type == 'ASSORTED':
                     loss_obj = ['AssortedTripletLoss', loss_fn]
+                elif loss_type == 'CONSTELLATION':
+                    loss_obj = ['ConstellationLoss', ConstellationLoss]
                 else:
                     loss_obj = None
                 if loss_obj is not None:
