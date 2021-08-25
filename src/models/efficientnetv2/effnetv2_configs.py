@@ -15,7 +15,7 @@
 """EfficientNet V1 and V2 model configs."""
 import functools
 import re
-import hparams
+import .hparams
 cfg_register = functools.partial(hparams.register, prefix='cfg:')
 
 
