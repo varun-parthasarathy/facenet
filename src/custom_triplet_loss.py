@@ -745,7 +745,7 @@ class ConstellationLoss(tf.keras.losses.Loss):
         for i in range(1, len(embeddings_list)):
             ctl_loss += tf.exp(loss_list[i])
 
-        ctl_loss = tf.log(ctl_loss)
+        ctl_loss = tf.math.log(ctl_loss)
 
         # # Get final mean constellation loss and divide due to very large loss value
         ctl_loss = tf.reduce_sum(ctl_loss) / 1000.
