@@ -736,7 +736,7 @@ class ConstellationLoss(tf.keras.losses.Loss):
 
             # (where label(a) != label(p) or label(n) == label(a) or a == p)
             mask = self._get_triplet_mask(labels_list[i])
-            mask = tf.to_float(mask)
+            mask = tf.cast(mask, tf.dtypes.float32)
             ctl_loss = tf.multiply(mask, ctl_loss)
 
             loss_list.append(ctl_loss)
