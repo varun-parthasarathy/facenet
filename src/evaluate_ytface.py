@@ -240,10 +240,10 @@ def main(weights_path, lfw_path, image_size, crop_size, model_type, loss_type,
     else:
         loss_obj = None
     if loss_obj is not None:
-        model = tf.keras.models.load_model(weights_path, custom_objects={loss_obj[0]:loss_obj[1]})
+        model = tf.keras.models.load_model(weights_path, custom_objects={loss_obj[0]:loss_obj[1]}, compile=False)
         #Another solution is skip the model_utils import and use : custom_objects={loss_obj[0]:loss_obj[1], 'tf':tf}
     else:
-        model = tf.keras.models.load_model(weights_path)
+        model = tf.keras.models.load_model(weights_path, compile=False)
 
     pairs, actual_issame, nrof_pairs = _read_pairs('./data/ytface_pairs.txt', lfw_path)
     embeddings = np.zeros((nrof_pairs*2, embedding_size))
