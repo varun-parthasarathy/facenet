@@ -16,7 +16,7 @@ from scipy import interpolate
 from scipy.optimize import brentq
 from sklearn.model_selection import KFold
 from adaptive_triplet_loss import AdaptiveTripletLoss
-from custom_triplet_loss import TripletBatchHardLoss, TripletFocalLoss, TripletBatchHardV2Loss, AssortedTripletLoss
+from custom_triplet_loss import TripletBatchHardLoss, TripletFocalLoss, TripletBatchHardV2Loss, AssortedTripletLoss, ConstellationLoss
 from model_utils import create_neural_network_v2
 import model_utils
 
@@ -261,6 +261,8 @@ def main(weights_path, lfw_path, image_size, crop_size, model_type, loss_type,
         loss_obj = ['TripletBatchHardV2Loss', TripletBatchHardV2Loss]
     elif loss_type == 'ASSORTED':
         loss_obj = ['AssortedTripletLoss', AssortedTripletLoss]
+    elif loss_type == 'CONSTELLATION':
+        loss_obj = ['ConstellationLoss', ConstellationLoss]
     else:
         loss_obj = None
     if loss_obj is not None:
