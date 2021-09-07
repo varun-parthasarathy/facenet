@@ -333,10 +333,12 @@ if __name__ == '__main__':
                         choices=['resnet50', 'resnet101', 'resnet152', 'inception_v3', 'efficientnet_b0',
                                  'efficientnet_b1', 'efficientnet_b2', 'efficientnet_b3', 'efficientnet_b4', 
                                  'efficientnet_b5', 'efficientnet_b6', 'efficientnet_b7', 'inception_resnet_v2',
-                                 'xception', 'mobilenet', 'mobilenet_v2'],
+                                 'xception', 'mobilenet', 'mobilenet_v2', 'efficientnetv2-s', 'efficientnetv2-m',
+                                 'efficientnetv2-l', 'efficientnetv2-xl', 'efficientnetv2-b0', 'efficientnetv2-b1',
+                                 'efficientnetv2-b2', 'efficientnetv2-b3'],
                         help='NN architecture to use. Default is EfficientNet-B2')
     parser.add_argument('--loss_type', type=str, default='FOCAL',
-                        choices=['VANILLA', 'BATCH_HARD', 'BATCH_HARD_V2', 'FOCAL', 'ADAPTIVE', 'ASSORTED'],
+                        choices=['VANILLA', 'BATCH_HARD', 'BATCH_HARD_V2', 'FOCAL', 'ADAPTIVE', 'ASSORTED', 'CONSTELLATION'],
                         help='Choice of triplet loss formulation. Default is FOCAL')
     parser.add_argument('--load_from_file', action='store_true',
                         help='Load embeddings and labels from file instead of running inference again')
