@@ -22,6 +22,7 @@ from custom_triplet_loss import TripletBatchHardLoss, TripletFocalLoss, TripletB
 from dataset_utils import generate_training_dataset, get_test_dataset, get_LFW_dataset
 from triplet_callbacks_and_metrics import RangeTestCallback, DecayMarginCallback, TripletLossMetrics, ToggleMetricEval
 from model_utils import create_neural_network_v2
+from tensorflow_similarity.losses import MultiSimilarityLoss
 
 
 def create_neural_network(model_type='resnet50', embedding_size=512, input_shape=None, weights_path='',
@@ -342,6 +343,18 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
     elif triplet_strategy == 'CONSTELLATION':
         loss_fn = ConstellationLoss(k=int(margin) if margin > 1 else 4,
                                     batch_size=batch_size)
+    elif triplet_strategy == 'MULTISIMILARITY':
+        if distance_metric == 'L2':
+            dist = 'euclidean'
+        elif distance_metric == 'angular':
+            dist = 'cosine'
+        else:
+            dist = 'squared_euclidean'
+        loss_fn = MultiSimilarityLoss(distance=dist,
+                                      alpha=1.0,
+                                      beta=20,
+                                      epsilon=margin,
+                                      lmda=sigma if sigma < 1 else 0.5)
     else:
         loss_fn = TripletFocalLoss(margin=margin,
                                    sigma=sigma,
@@ -375,13 +388,13 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
         if use_tpu is True:
             with strategy.scope():
                 model, compiled = create_neural_network_v2(model_type=model_type,
-                                                        embedding_size=embedding_size,
-                                                        weights_path=weights_path,
-                                                        loss_type=loss_to_load,
-                                                        loss_fn=loss_fn,
-                                                        recompile=recompile,
-                                                        input_shape=[crop_size, crop_size, 3],
-                                                        use_imagenet=use_imagenet)
+                                                           embedding_size=embedding_size,
+                                                           weights_path=weights_path,
+                                                           loss_type=loss_to_load,
+                                                           loss_fn=loss_fn,
+                                                           recompile=recompile,
+                                                           input_shape=[crop_size, crop_size, 3],
+                                                           use_imagenet=use_imagenet)
                 assert model is not None, '[ERROR] There was a problem while loading the pre-trained weights'
                 if compiled is False:
                     print('[INFO] Recompiling model using passed optimizer and loss arguments')
@@ -392,13 +405,13 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
         elif distributed is True and use_tpu is False:
             with mirrored_strategy.scope():
                 model, compiled = create_neural_network_v2(model_type=model_type,
-                                                        embedding_size=embedding_size,
-                                                        weights_path=weights_path,
-                                                        loss_type=loss_to_load,
-                                                        loss_fn=loss_fn,
-                                                        recompile=recompile,
-                                                        input_shape=[crop_size, crop_size, 3],
-                                                        use_imagenet=use_imagenet)
+                                                           embedding_size=embedding_size,
+                                                           weights_path=weights_path,
+                                                           loss_type=loss_to_load,
+                                                           loss_fn=loss_fn,
+                                                           recompile=recompile,
+                                                           input_shape=[crop_size, crop_size, 3],
+                                                           use_imagenet=use_imagenet)
                 opt = get_optimizer(optimizer_name=optimizer,
                                     lr_schedule=1e-5,
                                     weight_decay=weight_decay) # Optimizer must be created within scope!
@@ -411,13 +424,13 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                   run_eagerly=run_eagerly)
         else:
             model, compiled = create_neural_network_v2(model_type=model_type,
-                                                    embedding_size=embedding_size,
-                                                    weights_path=weights_path,
-                                                    loss_type=loss_to_load,
-                                                    loss_fn=loss_fn,
-                                                    recompile=recompile,
-                                                    input_shape=[crop_size, crop_size, 3],
-                                                    use_imagenet=use_imagenet)
+                                                       embedding_size=embedding_size,
+                                                       weights_path=weights_path,
+                                                       loss_type=loss_to_load,
+                                                       loss_fn=loss_fn,
+                                                       recompile=recompile,
+                                                       input_shape=[crop_size, crop_size, 3],
+                                                       use_imagenet=use_imagenet)
             assert model is not None, '[ERROR] There was a problem while loading the pre-trained weights'
             if compiled is False:
                 print('[INFO] Recompiling model using passed optimizer and loss arguments')
@@ -463,13 +476,13 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
         if use_tpu is True:
             with strategy.scope():
                 model, compiled = create_neural_network_v2(model_type=model_type,
-                                                        embedding_size=embedding_size,
-                                                        weights_path=weights_path,
-                                                        loss_type=loss_to_load,
-                                                        loss_fn=loss_fn,
-                                                        recompile=recompile,
-                                                        input_shape=[crop_size, crop_size, 3],
-                                                        use_imagenet=use_imagenet)
+                                                           embedding_size=embedding_size,
+                                                           weights_path=weights_path,
+                                                           loss_type=loss_to_load,
+                                                           loss_fn=loss_fn,
+                                                           recompile=recompile,
+                                                           input_shape=[crop_size, crop_size, 3],
+                                                           use_imagenet=use_imagenet)
                 assert model is not None, '[ERROR] There was a problem in loading the pre-trained weights'
                 if compiled is False:
                     print('[INFO] Recompiling model using passed optimizer and loss arguments')
@@ -480,13 +493,13 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
         elif distributed is True and use_tpu is False:
             with mirrored_strategy.scope():
                 model, compiled = create_neural_network_v2(model_type=model_type,
-                                                        embedding_size=embedding_size,
-                                                        weights_path=weights_path,
-                                                        loss_type=loss_to_load,
-                                                        loss_fn=loss_fn,
-                                                        recompile=recompile,
-                                                        input_shape=[crop_size, crop_size, 3],
-                                                        use_imagenet=use_imagenet)
+                                                           embedding_size=embedding_size,
+                                                           weights_path=weights_path,
+                                                           loss_type=loss_to_load,
+                                                           loss_fn=loss_fn,
+                                                           recompile=recompile,
+                                                           input_shape=[crop_size, crop_size, 3],
+                                                           use_imagenet=use_imagenet)
                 opt = get_optimizer(optimizer_name=optimizer,
                                     lr_schedule=lr_schedule,
                                     weight_decay=weight_decay) # Optimizer must be created within scope!
@@ -499,13 +512,13 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                   run_eagerly=run_eagerly)
         else:
             model, compiled = create_neural_network_v2(model_type=model_type,
-                                                    embedding_size=embedding_size,
-                                                    weights_path=weights_path,
-                                                    loss_type=loss_to_load,
-                                                    loss_fn=loss_fn,
-                                                    recompile=recompile,
-                                                    input_shape=[crop_size, crop_size, 3],
-                                                    use_imagenet=use_imagenet)
+                                                       embedding_size=embedding_size,
+                                                       weights_path=weights_path,
+                                                       loss_type=loss_to_load,
+                                                       loss_fn=loss_fn,
+                                                       recompile=recompile,
+                                                       input_shape=[crop_size, crop_size, 3],
+                                                       use_imagenet=use_imagenet)
             assert model is not None, '[ERROR] There was a problem in loading the pre-trained weights'
             if compiled is False:
                 print('[INFO] Recompiling model using passed optimizer and loss arguments')
@@ -587,7 +600,7 @@ if __name__ == '__main__':
     parser.add_argument('--use_mixed_precision', action='store_true',
                         help='Use mixed precision for training. Can greatly reduce memory consumption')
     parser.add_argument('--triplet_strategy', type=str, default='FOCAL',
-                        choices=['VANILLA', 'BATCH_HARD', 'BATCH_HARD_V2', 'FOCAL', 'ADAPTIVE', 'ASSORTED', 'CONSTELLATION'],
+                        choices=['VANILLA', 'BATCH_HARD', 'BATCH_HARD_V2', 'FOCAL', 'ADAPTIVE', 'ASSORTED', 'CONSTELLATION', 'MULTISIMILARITY'],
                         help='Choice of triplet loss formulation. Default is FOCAL')
     parser.add_argument('--images_per_person', required=False, type=int, default=35,
                         help='Average number of images per class. Default is 35 (from MS1M cleaned + AsianCeleb)')
@@ -599,7 +612,7 @@ if __name__ == '__main__':
     parser.add_argument('--soft', action='store_true',
                         help='Use soft margin. For ASSORTED strategy, sets whether to use triplet focal loss or not')
     parser.add_argument('--sigma', type=float, required=False, default=0.3,
-                        help='Value of sigma for FOCAL strategy. For ADAPTIVE strategy, specifies lambda')
+                        help='Value of sigma for FOCAL strategy. For ADAPTIVE and MULTISIMILARITY strategies, specifies lambda')
     parser.add_argument('--decay_margin_rate', type=float, required=False, default=0.0,
                         help='Decay rate for margin. Recommended value to set is 0.9965')
     parser.add_argument('--use_lfw', action='store_true',
@@ -625,7 +638,7 @@ if __name__ == '__main__':
     parser.add_argument('--equisample', action='store_true',
                         help='Determines whether to sample images from each class equally to form a batch. Will have performance drawbacks if enabled')
     parser.add_argument('--loss_to_load', type=str, default='FOCAL',
-                        choices=['VANILLA', 'BATCH_HARD', 'BATCH_HARD_V2', 'FOCAL', 'ADAPTIVE', 'ASSORTED', 'CONSTELLATION'],
+                        choices=['VANILLA', 'BATCH_HARD', 'BATCH_HARD_V2', 'FOCAL', 'ADAPTIVE', 'ASSORTED', 'CONSTELLATION', 'MULTISIMILARITY'],
                         help='Choice of triplet loss object for loading models. Default is FOCAL')
     parser.add_argument('--use_imagenet', action='store_true',
                         help='Use pre-trained ImageNet weights')
