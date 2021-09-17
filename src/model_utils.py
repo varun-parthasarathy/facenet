@@ -14,6 +14,8 @@ from tensorflow.keras.applications.inception_v3 import InceptionV3
 from tensorflow.keras.applications.inception_resnet_v2 import InceptionResNetV2
 from tensorflow.keras.mixed_precision import experimental as mixed_precision
 from custom_triplet_loss import TripletBatchHardLoss, TripletFocalLoss, TripletBatchHardV2Loss, AssortedTripletLoss, ConstellationLoss
+from tensorflow_similarity.losses import MultiSimilarityLoss
+from tensorflow_similarity.layers import MetricEmbedding
 
 
 def Backbone(model_type='resnet50', use_imagenet=True):
@@ -81,6 +83,7 @@ def Backbone(model_type='resnet50', use_imagenet=True):
 def OutputLayer(embedding_size=512, name='OutputLayer', model_type='resnet50'):
     def output_layer(x_in):
         inputs = Input(x_in.shape[1:])
+        '''
         if 'efficientnet' in model_type:
             x = Dropout(0.3, name='top_dropout')(inputs)
             logits = Dense(embedding_size, activation=None)(x)
@@ -88,6 +91,12 @@ def OutputLayer(embedding_size=512, name='OutputLayer', model_type='resnet50'):
             logits = Dense(embedding_size, activation=None)(inputs)
         embeddings = tf.keras.layers.Lambda(lambda k: tf.math.l2_normalize(k, axis=1), dtype='float32',
                                             name='embeddings')(logits)
+        '''
+        if 'efficientnet' in model_type:
+            x = Dropout(0.3, name='top_dropout')(inputs)
+            embeddings = MetricEmbedding(embedding_size)(x)
+        else:
+            embeddings = MetricEmbedding(embedding_size)(inputs)
         return Model(inputs=inputs, outputs=embeddings, name=name)(x_in)
     return output_layer
 
@@ -122,10 +131,12 @@ def create_neural_network_v2(model_type='resnet50', embedding_size=512, input_sh
                     tf.keras.layers.InputLayer(input_shape=input_shape),
                     effnetv2_model.get_model(model_type, include_top=False, weights=weights, input_size=input_shape[0]),
                     tf.keras.layers.Dropout(rate=0.3),
-                    tf.keras.layers.Dense(embedding_size, activation=None, name='logits'),
-                    tf.keras.layers.Lambda(lambda k: tf.math.l2_normalize(k, axis=1), dtype='float32',
-                                           name='embeddings')
+                    MetricEmbedding(embedding_size)
                 ])
+                    # tf.keras.layers.Dense(embedding_size, activation=None, name='logits'),
+                    # tf.keras.layers.Lambda(lambda k: tf.math.l2_normalize(k, axis=1), dtype='float32',
+                    #                        name='embeddings')
+                # ])
     else:
         inputs = Input(input_shape, name='image_input')
         backbone = Backbone(model_type=model_type, use_imagenet=use_imagenet)(inputs)

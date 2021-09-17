@@ -20,6 +20,7 @@ from adaptive_triplet_loss import AdaptiveTripletLoss
 from custom_triplet_loss import TripletBatchHardLoss, TripletFocalLoss, TripletBatchHardV2Loss, AssortedTripletLoss, ConstellationLoss
 from model_utils import create_neural_network_v2
 import model_utils
+from tensorflow_similarity.losses import MultiSimilarityLoss
 
 
 def _read_pairs(pairs_filename, lfw_path):
@@ -240,10 +241,10 @@ def main(weights_path, lfw_path, image_size, crop_size, model_type, loss_type,
     else:
         loss_obj = None
     if loss_obj is not None:
-        model = tf.keras.models.load_model(weights_path, custom_objects={loss_obj[0]:loss_obj[1]}, compile=False)
+        model = tf.keras.models.load_model(weights_path, custom_objects={loss_obj[0]:loss_obj[1]})
         #Another solution is skip the model_utils import and use : custom_objects={loss_obj[0]:loss_obj[1], 'tf':tf}
     else:
-        model = tf.keras.models.load_model(weights_path, compile=False)
+        model = tf.keras.models.load_model(weights_path)
 
     pairs, actual_issame, nrof_pairs = _read_pairs('./data/ytface_pairs.txt', lfw_path)
     embeddings = np.zeros((nrof_pairs*2, embedding_size))
@@ -338,7 +339,7 @@ if __name__ == '__main__':
                                  'efficientnetv2-b2', 'efficientnetv2-b3'],
                         help='NN architecture to use. Default is EfficientNet-B2')
     parser.add_argument('--loss_type', type=str, default='FOCAL',
-                        choices=['VANILLA', 'BATCH_HARD', 'BATCH_HARD_V2', 'FOCAL', 'ADAPTIVE', 'ASSORTED', 'CONSTELLATION'],
+                        choices=['VANILLA', 'BATCH_HARD', 'BATCH_HARD_V2', 'FOCAL', 'ADAPTIVE', 'ASSORTED', 'CONSTELLATION', 'MULTISIMILARITY'],
                         help='Choice of triplet loss formulation. Default is FOCAL')
     parser.add_argument('--load_from_file', action='store_true',
                         help='Load embeddings and labels from file instead of running inference again')
