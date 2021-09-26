@@ -224,7 +224,7 @@ def _calculate_val_far(threshold, dist, actual_issame):
 
 def main(weights_path, lfw_path, image_size, crop_size, model_type, loss_type,
          batch_size=50, use_mixed_precision=False, use_tpu=False, embedding_size=512,
-         load_from_file=False):
+         load_from_file=False, distance_metric=0):
     model = None
     if loss_type == 'ADAPTIVE':
         loss_obj = ['AdaptiveTripletLoss', AdaptiveTripletLoss]
@@ -308,10 +308,10 @@ def main(weights_path, lfw_path, image_size, crop_size, model_type, loss_type,
     embeddings2 = y_pred[1::2]
 
     tpr, fpr, accuracy, acc_std = _calculate_roc(thresholds, embeddings1, embeddings2,
-                                                 actual_issame, nrof_folds=10, distance_metric=0)
+                                                 actual_issame, nrof_folds=10, distance_metric=distance_metric)
     thresholds = np.arange(0, 2, 0.001)
     val, val_std, far = _calculate_val(thresholds, embeddings1, embeddings2,
-                                       actual_issame, 1e-3, nrof_folds=10, distance_metric=0)
+                                       actual_issame, 1e-3, nrof_folds=10, distance_metric=distance_metric)
     auc = metrics.auc(fpr, tpr)
     eer = brentq(lambda x: 1. - x - interpolate.interp1d(fpr, tpr, fill_value='extrapolate')(x), 0., 1.)
     acc = np.mean(accuracy)
@@ -343,6 +343,8 @@ if __name__ == '__main__':
                         help='Choice of triplet loss formulation. Default is FOCAL')
     parser.add_argument('--load_from_file', action='store_true',
                         help='Load embeddings and labels from file instead of running inference again')
+    parser.add_argument('-d', '--distance_metric', required=False, type=int, default=0,
+                        help='Distance metric to use. 0 = Euclidean, 1 = Cosine')
 
     args = vars(parser.parse_args())
     main(weights_path=args['weights_path'],
@@ -351,4 +353,5 @@ if __name__ == '__main__':
          crop_size=args['crop_size'],
          model_type=args['model'],
          loss_type=args['loss_type'],
-         load_from_file=args['load_from_file'])
+         load_from_file=args['load_from_file'],
+         distance_metric=args['distance_metric'])
