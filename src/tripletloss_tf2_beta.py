@@ -467,6 +467,8 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
             os.mkdir(checkpoint_path)
 
         #checkpoint_name = checkpoint_path + '/' + 'cp-{epoch:03d}.ckpt'
+        if checkpoint_interval == 0:
+            checkpoint_interval = 'epoch'
         checkpoint_saver = tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_path,
                                                               save_weights_only=False,
                                                               monitor='val_loss',
