@@ -17,7 +17,7 @@ from tensorflow.keras.applications.mobilenet import MobileNet
 from tensorflow.keras.applications.mobilenet_v2 import MobileNetV2
 from tensorflow.keras.applications.inception_v3 import InceptionV3
 from tensorflow.keras.applications.inception_resnet_v2 import InceptionResNetV2
-from tensorflow.keras.mixed_precision import experimental as mixed_precision
+from tensorflow.keras import mixed_precision
 from custom_triplet_loss import TripletBatchHardLoss, TripletFocalLoss, TripletBatchHardV2Loss, AssortedTripletLoss, ConstellationLoss
 from dataset_utils import generate_training_dataset, get_test_dataset, get_LFW_dataset
 from triplet_callbacks_and_metrics import RangeTestCallback, DecayMarginCallback, TripletLossMetrics, ToggleMetricEval
@@ -267,7 +267,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
             policy = mixed_precision.Policy('mixed_bfloat16')
         else:
             policy = mixed_precision.Policy('mixed_float16')
-        mixed_precision.set_policy(policy)
+        mixed_precision.set_global_policy(policy)
         print("[INFO] Using mixed precision for training. This will reduce memory consumption\n")
 
     if distributed is True and use_tpu is False:
