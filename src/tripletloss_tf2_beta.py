@@ -374,7 +374,10 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                                           write_graph=False)
     stop_on_nan = tf.keras.callbacks.TerminateOnNaN()
 
-    triplet_loss_metrics = TripletLossMetrics(test_images, embedding_size)
+    if test_dataset is not None:
+        triplet_loss_metrics = TripletLossMetrics(test_images, embedding_size)
+    else:
+        triplet_loss_metrics = None
     toggle_metrics = ToggleMetricEval()
 
     if range_test is True:
