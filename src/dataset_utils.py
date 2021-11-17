@@ -174,6 +174,90 @@ def generate_training_dataset(data_path, image_size, batch_size, crop_size, cach
     return ds, image_count, len(CLASS_NAMES)
 
 
+def generate_training_dataset_v2(data_path, image_size, batch_size, crop_size, cache='',
+                                 use_mixed_precision=False, images_per_person=35, people_per_sample=50, 
+                                 use_tpu=False, model_type=None, equisample=False):
+    data_path = pathlib.Path(data_path)
+    AUTOTUNE = tf.data.experimental.AUTOTUNE
+    CLASS_NAMES = [item.name for item in data_path.iterdir() if item.is_dir()]
+    CLASS_NAMES.sort()
+    CLASS_NAMES = np.array(CLASS_NAMES)
+    image_count = len(list(data_path.glob('*/*.png')))
+    batches = image_count / batch_size
+    if batches != int(batches):
+        batches = int(batches) + 1
+    else:
+        batches = int(batches)
+    print("[INFO] Image count in training dataset : %d" % (image_count))
+    print("[INFO] Using V2 method for generating dataset")
+    print("[INFO] Number of batches in dataset : %d" % (batches))
+    preprocessor = _get_preprocessor(model_type)
+
+
+    def get_label(file_path):
+        parts = tf.strings.split(file_path, os.path.sep)
+        return tf.argmax(parts[-2] == CLASS_NAMES)
+
+    def decode_img(img):
+        #img = tf.io.decode_image(img, channels=3, expand_animations=False)
+        img = tf.io.decode_png(img, channels=3)
+        if use_mixed_precision is True:
+            if use_tpu is True:
+                img = tf.cast(img, tf.bfloat16)
+            else:
+                img = tf.cast(img, tf.float16)
+        else:
+            img = tf.cast(img, tf.float32)
+        img = tf.image.resize(img, [image_size, image_size])
+        return img
+
+    def process_path(file_path):
+        label = get_label(file_path)
+        img = tf.io.read_file(file_path)
+        img = decode_img(img)
+        if preprocessor is not None:
+            img = preprocessor.preprocess_input(img)
+        else:
+            img = img / 255.
+        img = tf.image.random_crop(img, [crop_size, crop_size, 3])
+        img = tf.image.random_flip_left_right(img)
+        #img = tf.image.random_brightness(img, 0.2)
+        #img = tf.image.random_contrast(img, 0.8, 1.0)
+        #img = tf.image.random_jpeg_quality(img, 75, 100)
+        return img, label
+
+    def get_images(f):
+        return tf.data.Dataset.list_files(tf.strings.join([f, '/*.png']))
+
+    def process_path_bulk(batch):
+        #reqd_dtype = tf.float16 if use_mixed_precision is True else tf.float32
+        #reqd_dtype = tf.bfloat16 if use_tpu is True else reqd_dtype
+        #batch = tf.map_fn(process_path, batch, fn_output_signature=reqd_dtype)
+        # The above code may not be needed as vectorized_map should handle this without issues
+        # However, I have left it in for safety purposes.
+        batch = tf.vectorized_map(process_path, batch)
+        return batch
+
+    ds = None
+    if equisample is True:
+        classes_in_path = [str(i) for i in data_path.iterdir() if i.is_dir()]
+        classes_ds = tf.data.Dataset.from_tensor_slices(classes_in_path)
+        classes_ds = classes_ds.shuffle(len(classes_in_path), reshuffle_each_iteration=True)
+        ds = classes_ds.interleave(lambda f: get_images(f), block_length=images_per_person,
+                                   cycle_length=people_per_sample, num_parallel_calls=AUTOTUNE)
+        ds = ds.batch(batch_size).shuffle(batches, reshuffle_each_iteration=True)
+        ds = ds.map(process_path_bulk, num_parallel_calls=AUTOTUNE, deterministic=False)
+        ds = ds.prefetch(AUTOTUNE)
+    else:
+        ds = tf.data.Dataset.list_files(str(data_path/"*/*.png"), shuffle=False)
+        ds = ds.shuffle(images_per_person * people_per_sample).batch(batch_size)
+        ds = ds.shuffle(batches, reshuffle_each_iteration=True)
+        ds = ds.map(process_path_bulk, num_parallel_calls=AUTOTUNE, deterministic=False)
+        ds = ds.prefetch(AUTOTUNE)
+
+    return ds, image_count, len(CLASS_NAMES)
+
+
 def get_test_dataset(data_path, image_size, batch_size, crop_size, cache='', train_classes=0,
                      use_mixed_precision=False, use_tpu=False, model_type=None):
     data_path = pathlib.Path(data_path)

@@ -25,130 +25,6 @@ from model_utils import create_neural_network_v2
 from tensorflow_similarity.losses import MultiSimilarityLoss
 
 
-def create_neural_network(model_type='resnet50', embedding_size=512, input_shape=None, weights_path='',
-                          loss_type='ADAPTIVE', loss_fn=None, recompile=False):
-    base_model = None
-    if model_type == 'resnet50':
-        base_model = ResNet50(weights=None, classes=embedding_size, classifier_activation=None)
-    elif model_type == 'resnet101':
-        base_model = ResNet101(weights=None, classes=embedding_size, classifier_activation=None)
-    elif model_type == 'resnet152':
-        base_model = ResNet152(weights=None, classes=embedding_size, classifier_activation=None)
-    elif model_type == 'inception_v3':
-        base_model = InceptionV3(weights=None, classes=embedding_size, classifier_activation=None)
-    elif model_type == 'efficientnet_b0':
-        base_model = EfficientNetB0(weights=None, classes=embedding_size, classifier_activation=None, 
-                                    activation=tfa.activations.mish)
-    elif model_type == 'efficientnet_b1':
-        base_model = EfficientNetB1(weights=None, classes=embedding_size, classifier_activation=None, 
-                                    activation=tfa.activations.mish)
-    elif model_type == 'efficientnet_b2':
-        base_model = EfficientNetB2(weights=None, classes=embedding_size, classifier_activation=None, 
-                                    activation=tfa.activations.mish)
-    elif model_type == 'efficientnet_b3':
-        base_model = EfficientNetB3(weights=None, classes=embedding_size, classifier_activation=None, 
-                                    activation=tfa.activations.mish)
-    elif model_type == 'efficientnet_b4':
-        base_model = EfficientNetB4(weights=None, classes=embedding_size, classifier_activation=None, 
-                                    activation=tfa.activations.mish)
-    elif model_type == 'efficientnet_b5':
-        base_model = EfficientNetB5(weights=None, classes=embedding_size, classifier_activation=None, 
-                                    activation=tfa.activations.mish)
-    elif model_type == 'efficientnet_b6':
-        base_model = EfficientNetB6(weights=None, classes=embedding_size, classifier_activation=None, 
-                                    activation=tfa.activations.mish)
-    elif model_type == 'efficientnet_b7':
-        base_model = EfficientNetB7(weights=None, classes=embedding_size, classifier_activation=None, 
-                                    activation=tfa.activations.mish)
-    elif model_type == 'inception_resnet_v2':
-        base_model = InceptionResNetV2(weights=None, classes=embedding_size, classifier_activation=None)
-    elif model_type == 'xception':
-        base_model = Xception(weights=None, classes=embedding_size, classifier_activation=None)
-    elif model_type == 'mobilenet':
-        base_model = MobileNet(weights=None, classes=embedding_size, classifier_activation=None)
-    elif model_type == 'mobilenet_v2':
-        base_model = MobileNetV2(weights=None, classes=embedding_size, classifier_activation=None)
-    else:
-        pass
-
-    assert base_model is not None, '[ERROR] The model name was not correctly specified'
-
-    logits = base_model.output # NOT outputs!
-    embeddings = tf.keras.layers.Lambda(lambda x: tf.math.l2_normalize(x, axis=1), dtype='float32',
-                                        name='embeddings')(logits)
-    # embeddings = tf.keras.layers.Activation('linear', dtype='float32')(embeddings)
-    model = Model(inputs=base_model.input, outputs=embeddings)
-    compiled = False
-
-    if input_shape is not None:
-        in_shape = np.array(model.input.shape)
-        in_shape = tuple(in_shape[-3:])
-        assert in_shape == input_shape, '[ERROR] The model input shape and the given input shape do not match'
-
-    if len(weights_path) > 1 and os.path.exists(weights_path):
-        print('[INFO] Attempting to load weights from most recently saved checkpoint')
-        loss_obj = None
-        try:
-            if recompile is True:
-                if loss_type == 'ADAPTIVE':
-                    loss_obj = ['AdaptiveTripletLoss', AdaptiveTripletLoss]
-                elif loss_type == 'FOCAL':
-                    loss_obj = ['TripletFocalLoss', TripletFocalLoss]
-                elif loss_type == 'BATCH_HARD':
-                    loss_obj = ['TripletBatchHardLoss', TripletBatchHardLoss]
-                elif loss_type == 'BATCH_HARD_V2':
-                    loss_obj = ['TripletBatchHardV2Loss', TripletBatchHardV2Loss]
-                elif loss_type == 'ASSORTED':
-                    loss_obj = ['AssortedTripletLoss', AssortedTripletLoss]
-                elif loss_type == 'CONSTELLATION':
-                    loss_obj = ['ConstellationLoss', ConstellationLoss]
-                else:
-                    loss_obj = None
-                if loss_obj is not None:
-                    model = tf.keras.models.load_model(weights_path, custom_objects={loss_obj[0]:loss_obj[1]})
-                else:
-                    model = tf.keras.models.load_model(weights_path)
-                compiled = False
-                print('[WARNING] Model will be compiled again. If you wish to start from a previously saved optimizer state, this is not recommended')
-            else:
-                if loss_type == 'ADAPTIVE':
-                    loss_obj = ['AdaptiveTripletLoss', loss_fn]
-                elif loss_type == 'FOCAL':
-                    loss_obj = ['TripletFocalLoss', loss_fn]
-                elif loss_type == 'BATCH_HARD':
-                    loss_obj = ['TripletBatchHardLoss', loss_fn]
-                elif loss_type == 'BATCH_HARD_V2':
-                    loss_obj = ['TripletBatchHardV2Loss', loss_fn]
-                elif loss_type == 'ASSORTED':
-                    loss_obj = ['AssortedTripletLoss', loss_fn]
-                elif loss_type == 'CONSTELLATION':
-                    loss_obj = ['ConstellationLoss', ConstellationLoss]
-                else:
-                    loss_obj = None
-                if loss_obj is not None:
-                    model = tf.keras.models.load_model(weights_path, custom_objects={loss_obj[0]:loss_obj[1]})
-                else:
-                    model = tf.keras.models.load_model(weights_path)
-                    print('[INFO] Loading model without custom objects')
-                compiled = True
-                print('[WARNING] Model is already compiled; ignoring passed optimizer, loss and learning rate parameters')
-            print('[INFO] Loading model from SavedModel format')
-        except:
-            try:
-                latest = tf.train.latest_checkpoint(weights_path)
-                model.load_weights(latest)
-                print('[WARNING] Loading model weights from ckpt format. Model state is not preserved')
-            except:
-                print('[ERROR] Weights did not match the model architecture specified, or path was incorrect')
-                print('[WARNING] Could not load weights. Using random initialization instead')
-                return model, False
-    else:
-        print('[WARNING] Could not load weights. Using random initialization instead')
-
-    model.summary()
-    
-    return model, compiled
-
 def get_learning_rate_schedule(schedule_name, image_count, batch_size, learning_rate=1e-3, max_lr=0.25,
                                step_size=30000):
     lr = None
@@ -277,17 +153,17 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
     if use_imagenet is None:
         use_imagenet = False
 
-    train_dataset, n_imgs, n_classes = generate_training_dataset(data_path=data_path, 
-                                                                 image_size=image_size, 
-                                                                 batch_size=batch_size, 
-                                                                 crop_size=crop_size, 
-                                                                 cache=cache_path,
-                                                                 use_mixed_precision=use_mixed_precision,
-                                                                 images_per_person=images_per_person,
-                                                                 people_per_sample=people_per_sample,
-                                                                 use_tpu=use_tpu,
-                                                                 model_type=model_type,
-                                                                 equisample=equisample)
+    train_dataset, n_imgs, n_classes = generate_training_dataset_v2(data_path=data_path, 
+                                                                    image_size=image_size, 
+                                                                    batch_size=batch_size, 
+                                                                    crop_size=crop_size, 
+                                                                    cache=cache_path,
+                                                                    use_mixed_precision=use_mixed_precision,
+                                                                    images_per_person=images_per_person,
+                                                                    people_per_sample=people_per_sample,
+                                                                    use_tpu=use_tpu,
+                                                                    model_type=model_type,
+                                                                    equisample=equisample)
 
     if test_path is not None and len(test_path) > 1:
         if use_lfw is True:
