@@ -19,7 +19,7 @@ from tensorflow.keras.applications.inception_v3 import InceptionV3
 from tensorflow.keras.applications.inception_resnet_v2 import InceptionResNetV2
 from tensorflow.keras import mixed_precision
 from custom_triplet_loss import TripletBatchHardLoss, TripletFocalLoss, TripletBatchHardV2Loss, AssortedTripletLoss, ConstellationLoss
-from dataset_utils import generate_training_dataset, get_test_dataset, get_LFW_dataset
+from dataset_utils import generate_training_dataset, get_test_dataset, get_LFW_dataset, generate_training_dataset_v2
 from triplet_callbacks_and_metrics import RangeTestCallback, DecayMarginCallback, TripletLossMetrics, ToggleMetricEval
 from model_utils import create_neural_network_v2
 from tensorflow_similarity.losses import MultiSimilarityLoss
