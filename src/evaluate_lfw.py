@@ -282,7 +282,8 @@ def main(weights_path, lfw_path, image_size, crop_size, model_type, loss_type,
                                                             model_type=model_type)
 
     actual_issame = np.asarray(actual_issame)
-    embeddings = np.zeros((nrof_images, embedding_size))
+    #embeddings = np.zeros((nrof_images, embedding_size))
+    embeddings = None
     labels = np.zeros((nrof_images,))
     start_idx = 0
     print('[INFO] There are %d images to process in the dataset' % (nrof_images))
@@ -294,6 +295,8 @@ def main(weights_path, lfw_path, image_size, crop_size, model_type, loss_type,
                 embs = model.predict(xs)
                 end_idx = start_idx + np.squeeze(embs).shape[0]
                 labels[start_idx:end_idx] = np.squeeze(ys)
+                if embeddings is None:
+                    embeddings = np.zeros((nrof_images, np.squeeze(embs).shape[1]))
                 embeddings[start_idx:end_idx] = np.squeeze(embs)
                 start_idx = end_idx
                 pbar.update(1)

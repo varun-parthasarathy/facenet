@@ -247,7 +247,8 @@ def main(weights_path, lfw_path, image_size, crop_size, model_type, loss_type,
         model = tf.keras.models.load_model(weights_path)
 
     pairs, actual_issame, nrof_pairs = _read_pairs('./data/ytface_pairs.txt', lfw_path)
-    embeddings = np.zeros((nrof_pairs*2, embedding_size))
+    #embeddings = np.zeros((nrof_pairs*2, embedding_size))
+    embeddings = None
 
     if load_from_file is None or load_from_file is False:
         for pair_num, pair in enumerate(tqdm(pairs, file=sys.stdout)):
@@ -268,10 +269,12 @@ def main(weights_path, lfw_path, image_size, crop_size, model_type, loss_type,
                 else:
                     temp_emb = np.vstack((temp_emb, embs))
 
-            assert temp_emb.shape == (ic, embedding_size)
+            #assert temp_emb.shape == (ic, embedding_size)
             
             mean_emb = np.squeeze(np.mean(temp_emb, axis=0))
             #assert mean_emb.shape[1] == embedding_size
+            if embeddings is None:
+                embeddings = np.zeros((nrof_pairs*2, mean_emb.shape[1]))
             embeddings[2*pair_num] = mean_emb
 
             temp_emb = None
