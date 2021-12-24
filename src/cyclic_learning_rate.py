@@ -1,119 +1,133 @@
-import tensorflow as tf
-from tensorflow.python.framework import ops
-from tensorflow.python.ops import math_ops
-from tensorflow.python.eager import context
+from tensorflow.keras.callbacks import *
+from tensorflow.keras import backend as K
+import numpy as np
 
-def cyclic_learning_rate(global_step,
-                         learning_rate=0.01,
-                         max_lr=0.1,
-                         step_size=20.,
-                         gamma=0.9999970,
-                         mode='triangular',
-                         name=None):
-  """Applies cyclic learning rate (CLR).
-     From the paper:
-     Smith, Leslie N. "Cyclical learning
-     rates for training neural networks." 2017.
-     [https://arxiv.org/pdf/1506.01186.pdf]
-      This method lets the learning rate cyclically
-     vary between reasonable boundary values
-     achieving improved classification accuracy and
-     often in fewer iterations.
-      This code varies the learning rate linearly between the
-     minimum (learning_rate) and the maximum (max_lr).
-      It returns the cyclic learning rate. It is computed as:
-       ```python
-       cycle = floor( 1 + global_step /
-        ( 2 * step_size ) )
-      x = abs( global_step / step_size – 2 * cycle + 1 )
-      clr = learning_rate +
-        ( max_lr – learning_rate ) * max( 0 , 1 - x )
-       ```
-      Polices:
-        'triangular':
-          Default, linearly increasing then linearly decreasing the
-          learning rate at each cycle.
-         'triangular2':
-          The same as the triangular policy except the learning
-          rate difference is cut in half at the end of each cycle.
-          This means the learning rate difference drops after each cycle.
-         'exp_range':
-          The learning rate varies between the minimum and maximum
-          boundaries and each boundary value declines by an exponential
-          factor of: gamma^global_step.
-       Example: 'triangular2' mode cyclic learning rate.
-        '''python
-        ...
-        global_step = tf.Variable(0, trainable=False)
-        optimizer = tf.train.AdamOptimizer(learning_rate=
-          clr.cyclic_learning_rate(global_step=global_step, mode='triangular2'))
-        train_op = optimizer.minimize(loss_op, global_step=global_step)
-        ...
-         with tf.Session() as sess:
-            sess.run(init)
-            for step in range(1, num_steps+1):
-              assign_op = global_step.assign(step)
-              sess.run(assign_op)
-        ...
-         '''
-       Args:
-        global_step: A scalar `int32` or `int64` `Tensor` or a Python number.
-          Global step to use for the cyclic computation.  Must not be negative.
-        learning_rate: A scalar `float32` or `float64` `Tensor` or a
-        Python number.  The initial learning rate which is the lower bound
-          of the cycle (default = 0.1).
-        max_lr:  A scalar. The maximum learning rate boundary.
-        step_size: A scalar. The number of iterations in half a cycle.
-          The paper suggests step_size = 2-8 x training iterations in epoch.
-        gamma: constant in 'exp_range' mode:
-          gamma**(global_step)
+class CyclicLR(Callback):
+    """This callback implements a cyclical learning rate policy (CLR).
+    The method cycles the learning rate between two boundaries with
+    some constant frequency, as detailed in this paper (https://arxiv.org/abs/1506.01186).
+    The amplitude of the cycle can be scaled on a per-iteration or 
+    per-cycle basis.
+    This class has three built-in policies, as put forth in the paper.
+    "triangular":
+        A basic triangular cycle w/ no amplitude scaling.
+    "triangular2":
+        A basic triangular cycle that scales initial amplitude by half each cycle.
+    "exp_range":
+        A cycle that scales initial amplitude by gamma**(cycle iterations) at each 
+        cycle iteration.
+    For more detail, please see paper.
+    
+    # Example
+        ```python
+            clr = CyclicLR(base_lr=0.001, max_lr=0.006,
+                                step_size=2000., mode='triangular')
+            model.fit(X_train, Y_train, callbacks=[clr])
+        ```
+    
+    Class also supports custom scaling functions:
+        ```python
+            clr_fn = lambda x: 0.5*(1+np.sin(x*np.pi/2.))
+            clr = CyclicLR(base_lr=0.001, max_lr=0.006,
+                                step_size=2000., scale_fn=clr_fn,
+                                scale_mode='cycle')
+            model.fit(X_train, Y_train, callbacks=[clr])
+        ```    
+    # Arguments
+        base_lr: initial learning rate which is the
+            lower boundary in the cycle.
+        max_lr: upper boundary in the cycle. Functionally,
+            it defines the cycle amplitude (max_lr - base_lr).
+            The lr at any cycle is the sum of base_lr
+            and some scaling of the amplitude; therefore 
+            max_lr may not actually be reached depending on
+            scaling function.
+        step_size: number of training iterations per
+            half cycle. Authors suggest setting step_size
+            2-8 x training iterations in epoch.
         mode: one of {triangular, triangular2, exp_range}.
             Default 'triangular'.
             Values correspond to policies detailed above.
-        name: String.  Optional name of the operation.  Defaults to
-          'CyclicLearningRate'.
-       Returns:
-        A scalar `Tensor` of the same type as `learning_rate`.  The cyclic
-        learning rate.
-      Raises:
-        ValueError: if `global_step` is not supplied.
-      @compatibility(eager)
-      When eager execution is enabled, this function returns
-      a function which in turn returns the decayed learning
-      rate Tensor. This can be useful for changing the learning
-      rate value across different invocations of optimizer functions.
-      @end_compatibility
-  """
-  if global_step is None:
-    raise ValueError("global_step is required for cyclic_learning_rate.")
-  with ops.name_scope(name, "CyclicLearningRate",
-                      [learning_rate, global_step]) as name:
-    learning_rate = ops.convert_to_tensor(learning_rate, name="learning_rate")
-    dtype = learning_rate.dtype
-    global_step = math_ops.cast(global_step, dtype)
-    step_size = math_ops.cast(step_size, dtype)
-    max_lr = math_ops.cast(max_lr, dtype)
-    def cyclic_lr():
-      """Helper to recompute learning rate; most helpful in eager-mode."""
-      # computing: cycle = floor( 1 + global_step / ( 2 * step_size ) )
-      double_step = math_ops.multiply(2., step_size)
-      global_div_double_step = math_ops.divide(global_step, double_step)
-      cycle = math_ops.floor(math_ops.add(1., global_div_double_step))
-      # computing: x = abs( global_step / step_size – 2 * cycle + 1 )
-      double_cycle = math_ops.multiply(2., cycle)
-      global_div_step = math_ops.divide(global_step, step_size)
-      tmp = math_ops.subtract(global_div_step, double_cycle)
-      x = math_ops.abs(math_ops.add(1., tmp))
-      # computing: clr = learning_rate + ( max_lr – learning_rate ) * max( 0, 1 - x )
-      a1 = math_ops.maximum(0., math_ops.subtract(1., x))
-      a2 = math_ops.subtract(max_lr, learning_rate)
-      clr = math_ops.multiply(a1, a2)
-      if mode == 'triangular2':
-        clr = math_ops.divide(clr, math_ops.cast(math_ops.pow(2, math_ops.cast(
-            cycle-1, tf.int32)), tf.float32))
-      if mode == 'exp_range':
-        clr = math_ops.multiply(math_ops.pow(gamma, global_step), clr)
-      return math_ops.add(clr, learning_rate, name=name)
-    if not context.executing_eagerly():
-      cyclic_lr = cyclic_lr()
-    return cyclic_lr
+            If scale_fn is not None, this argument is ignored.
+        gamma: constant in 'exp_range' scaling function:
+            gamma**(cycle iterations)
+        scale_fn: Custom scaling policy defined by a single
+            argument lambda function, where 
+            0 <= scale_fn(x) <= 1 for all x >= 0.
+            mode paramater is ignored 
+        scale_mode: {'cycle', 'iterations'}.
+            Defines whether scale_fn is evaluated on 
+            cycle number or cycle iterations (training
+            iterations since start of cycle). Default is 'cycle'.
+    """
+
+    def __init__(self, base_lr=0.001, max_lr=0.006, step_size=2000., mode='triangular',
+                 gamma=1., scale_fn=None, scale_mode='cycle'):
+        super(CyclicLR, self).__init__()
+
+        self.base_lr = base_lr
+        self.max_lr = max_lr
+        self.step_size = step_size
+        self.mode = mode
+        self.gamma = gamma
+        if scale_fn == None:
+            if self.mode == 'triangular':
+                self.scale_fn = lambda x: 1.
+                self.scale_mode = 'cycle'
+            elif self.mode == 'triangular2':
+                self.scale_fn = lambda x: 1/(2.**(x-1))
+                self.scale_mode = 'cycle'
+            elif self.mode == 'exp_range':
+                self.scale_fn = lambda x: gamma**(x)
+                self.scale_mode = 'iterations'
+        else:
+            self.scale_fn = scale_fn
+            self.scale_mode = scale_mode
+        self.clr_iterations = 0.
+        self.trn_iterations = 0.
+        self.history = {}
+
+        self._reset()
+
+    def _reset(self, new_base_lr=None, new_max_lr=None,
+               new_step_size=None):
+        """Resets cycle iterations.
+        Optional boundary/step size adjustment.
+        """
+        if new_base_lr != None:
+            self.base_lr = new_base_lr
+        if new_max_lr != None:
+            self.max_lr = new_max_lr
+        if new_step_size != None:
+            self.step_size = new_step_size
+        self.clr_iterations = 0.
+        
+    def clr(self):
+        cycle = np.floor(1+self.clr_iterations/(2*self.step_size))
+        x = np.abs(self.clr_iterations/self.step_size - 2*cycle + 1)
+        if self.scale_mode == 'cycle':
+            return self.base_lr + (self.max_lr-self.base_lr)*np.maximum(0, (1-x))*self.scale_fn(cycle)
+        else:
+            return self.base_lr + (self.max_lr-self.base_lr)*np.maximum(0, (1-x))*self.scale_fn(self.clr_iterations)
+        
+    def on_train_begin(self, logs={}):
+        logs = logs or {}
+
+        if self.clr_iterations == 0:
+            K.set_value(self.model.optimizer.lr, self.base_lr)
+        else:
+            K.set_value(self.model.optimizer.lr, self.clr())        
+            
+    def on_batch_end(self, epoch, logs=None):
+        
+        logs = logs or {}
+        self.trn_iterations += 1
+        self.clr_iterations += 1
+
+        self.history.setdefault('lr', []).append(K.get_value(self.model.optimizer.lr))
+        self.history.setdefault('iterations', []).append(self.trn_iterations)
+
+        for k, v in logs.items():
+            self.history.setdefault(k, []).append(v)
+        
+        K.set_value(self.model.optimizer.lr, self.clr())

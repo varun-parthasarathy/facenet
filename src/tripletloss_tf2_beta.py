@@ -23,21 +23,30 @@ from dataset_utils import generate_training_dataset, get_test_dataset, get_LFW_d
 from triplet_callbacks_and_metrics import RangeTestCallback, DecayMarginCallback, TripletLossMetrics, ToggleMetricEval
 from model_utils import create_neural_network_v2
 from tensorflow_similarity.losses import MultiSimilarityLoss
+from cyclic_learning_rate import CyclicLR
 
 
 def get_learning_rate_schedule(schedule_name, image_count, batch_size, learning_rate=1e-3, max_lr=0.25,
                                step_size=30000):
     lr = None
     if schedule_name == 'triangular2':
-        lr = tfa.optimizers.Triangular2CyclicalLearningRate(initial_learning_rate=learning_rate,
-                                                            maximal_learning_rate=max_lr,
-                                                            step_size=step_size,
-                                                            scale_mode='iterations')
+        # lr = tfa.optimizers.Triangular2CyclicalLearningRate(initial_learning_rate=learning_rate,
+        #                                                     maximal_learning_rate=max_lr,
+        #                                                     step_size=step_size)
+        lr = CyclicLR(base_lr=learning_rate,
+                      max_lr=max_lr,
+                      step_size=step_size,
+                      mode='triangular2')
+        print('[WARNING] Due to bugs in tensorflow_addons, cyclic LR is currently a callback, not an LR policy. Use it accordingly')
     elif schedule_name == 'triangular':
-        lr = tfa.optimizers.TriangularCyclicalLearningRate(initial_learning_rate=learning_rate,
-                                                           maximal_learning_rate=max_lr,
-                                                           step_size=step_size,
-                                                           scale_mode='iterations')
+        # lr = tfa.optimizers.TriangularCyclicalLearningRate(initial_learning_rate=learning_rate,
+        #                                                    maximal_learning_rate=max_lr,
+        #                                                    step_size=step_size)
+        lr = CyclicLR(base_lr=learning_rate,
+                      max_lr=max_lr,
+                      step_size=step_size,
+                      mode='triangular')
+        print('[WARNING] Due to bugs in tensorflow_addons, cyclic LR is currently a callback, not an LR policy. Use it accordingly')
     elif schedule_name == 'exponential_decay':
         lr = tf.keras.optimizers.schedules.ExponentialDecay(initial_learning_rate=learning_rate,
                                                             decay_steps=step_size,
@@ -339,7 +348,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                                  batch_size=batch_size,
                                                  step_size=step_size)
         opt = get_optimizer(optimizer_name=optimizer,
-                            lr_schedule=lr_schedule,
+                            lr_schedule=lr_schedule if lr_schedule_name not in ['triangular2', 'triangular'] else init_lr,
                             weight_decay=weight_decay)
 
         if not os.path.exists(checkpoint_path):
@@ -382,7 +391,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                                            input_shape=[crop_size, crop_size, 3],
                                                            use_imagenet=use_imagenet)
                 opt = get_optimizer(optimizer_name=optimizer,
-                                    lr_schedule=lr_schedule,
+                                    lr_schedule=lr_schedule if lr_schedule_name not in ['triangular2', 'triangular'] else init_lr,
                                     weight_decay=weight_decay) # Optimizer must be created within scope!
                 assert model is not None, '[ERROR] There was a problem in loading the pre-trained weights'
                 if compiled is False:
@@ -413,6 +422,9 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
             callback_list.append(toggle_metrics)
         if decay_margin_callback is not None:
             callback_list.append(decay_margin_callback)
+        if lr_schedule_name in ['triangular2', 'triangular']:
+            callback_list.append(lr_schedule)
+            print('[INFO] Successfully added cyclic LR callback to model training')
 
         train_history = model.fit(train_dataset, 
                                   epochs=num_epochs, 
