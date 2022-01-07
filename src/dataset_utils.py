@@ -241,13 +241,18 @@ def generate_training_dataset_v2(data_path, image_size, batch_size, crop_size, c
     ds = None
     if equisample is True:
         classes_in_path = [str(i) for i in data_path.iterdir() if i.is_dir()]
-        classes_ds = tf.data.Dataset.from_tensor_slices(classes_in_path)
-        classes_ds = classes_ds.shuffle(len(classes_in_path), reshuffle_each_iteration=True)
-        ds = classes_ds.interleave(lambda f: get_images(f), block_length=images_per_person,
-                                   cycle_length=people_per_sample, num_parallel_calls=AUTOTUNE)
+        # classes_ds = tf.data.Dataset.from_tensor_slices(classes_in_path)
+        # classes_ds = classes_ds.shuffle(len(classes_in_path), reshuffle_each_iteration=True)
+        # ds = classes_ds.interleave(lambda f: get_images(f), block_length=images_per_person,
+        #                            cycle_length=people_per_sample, num_parallel_calls=AUTOTUNE)
+        classes_ds = [get_images(f) for f in classes_in_path]
+        weights = [1./len(classes_in_path) for i in classes_in_path]
+        ds = tf.data.Dataset.sample_from_datasets(classes_ds, weights=weights, stop_on_empty_dataset=False)
         ds = ds.batch(batch_size).shuffle(batches, reshuffle_each_iteration=True)
         ds = ds.map(process_path_bulk, num_parallel_calls=AUTOTUNE, deterministic=False)
         ds = ds.prefetch(AUTOTUNE)
+        ds = ds.apply(tf.data.experimental.assert_cardinality(batches)) # To ensure the dataset has a fixed cardinality
+                                                                        # while training - fixes the number of training steps
     else:
         ds = tf.data.Dataset.list_files(str(data_path/"*/*.png"), shuffle=False)
         ds = ds.shuffle(images_per_person * people_per_sample).batch(batch_size)
