@@ -18,7 +18,7 @@ from tensorflow_similarity.losses import MultiSimilarityLoss
 from efficientnetv2_models import get_efficientnetv2_model
 
 
-class MetricEmbedding(Layer):
+class MetricEmbedding(tf.keras.layers.Layer):
     def __init__(self, unit):
         """L2 Normalized `Dense` layer usually used as output layer.
         Args:
@@ -27,7 +27,7 @@ class MetricEmbedding(Layer):
             to a point at the expense of making search slower.
         """
         self.unit = unit
-        self.dense = layers.Dense(unit)
+        self.dense = Dense(unit)
         super().__init__()
         # FIXME: enforce the shape
         # self.input_spec = rank2
