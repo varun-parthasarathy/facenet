@@ -339,7 +339,7 @@ if __name__ == '__main__':
                                  'efficientnet_b5', 'efficientnet_b6', 'efficientnet_b7', 'inception_resnet_v2',
                                  'xception', 'mobilenet', 'mobilenet_v2', 'efficientnetv2-s', 'efficientnetv2-m',
                                  'efficientnetv2-l', 'efficientnetv2-xl', 'efficientnetv2-b0', 'efficientnetv2-b1',
-                                 'efficientnetv2-b2', 'efficientnetv2-b3'],
+                                 'efficientnetv2-b2', 'efficientnetv2-b3', 'efficientnetv2-t'],
                         help='NN architecture to use. Default is EfficientNet-B2')
     parser.add_argument('--loss_type', type=str, default='FOCAL',
                         choices=['VANILLA', 'BATCH_HARD', 'BATCH_HARD_V2', 'FOCAL', 'ADAPTIVE', 'ASSORTED', 'CONSTELLATION', 'MULTISIMILARITY'],
