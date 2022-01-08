@@ -15,7 +15,30 @@ from tensorflow.keras.applications.inception_resnet_v2 import InceptionResNetV2
 from tensorflow.keras.mixed_precision import experimental as mixed_precision
 from custom_triplet_loss import TripletBatchHardLoss, TripletFocalLoss, TripletBatchHardV2Loss, AssortedTripletLoss, ConstellationLoss
 from tensorflow_similarity.losses import MultiSimilarityLoss
-from tensorflow_similarity.layers import MetricEmbedding
+from efficientnetv2_models import get_efficientnetv2_model
+
+
+class MetricEmbedding(Layer):
+    def __init__(self, unit):
+        """L2 Normalized `Dense` layer usually used as output layer.
+        Args:
+            unit: Dimension of the output embbeding. Commonly between
+            32 and 512. Larger embeddings usually result in higher accuracy up
+            to a point at the expense of making search slower.
+        """
+        self.unit = unit
+        self.dense = layers.Dense(unit)
+        super().__init__()
+        # FIXME: enforce the shape
+        # self.input_spec = rank2
+
+    def call(self, inputs):
+        x = self.dense(inputs)
+        normed_x = tf.math.l2_normalize(x, axis=1)
+        return normed_x
+
+    def get_config(self):
+        return {'unit': self.unit}
 
 
 def Backbone(model_type='resnet50', use_imagenet=True):
@@ -127,16 +150,21 @@ def create_neural_network_v2(model_type='resnet50', embedding_size=512, input_sh
         else:
             weights = None
 
-        model = tf.keras.models.Sequential([
-                    tf.keras.layers.InputLayer(input_shape=input_shape),
-                    effnetv2_model.get_model(model_type, include_top=False, weights=weights, input_size=input_shape[0]),
-                    tf.keras.layers.Dropout(rate=0.3),
-                    MetricEmbedding(embedding_size)
-                ])
-                    # tf.keras.layers.Dense(embedding_size, activation=None, name='logits'),
-                    # tf.keras.layers.Lambda(lambda k: tf.math.l2_normalize(k, axis=1), dtype='float32',
-                    #                        name='embeddings')
-                # ])
+        # model = tf.keras.models.Sequential([
+        #             tf.keras.layers.InputLayer(input_shape=input_shape),
+        #             effnetv2_model.get_model(model_type, include_top=False, weights=weights, input_size=input_shape[0]),
+        #             tf.keras.layers.Dropout(rate=0.3),
+        #             MetricEmbedding(embedding_size)
+        #         ])
+        base_model = get_efficientnetv2_model(model_type=model_type,
+                                              input_shape=input_shape,
+                                              num_classes=0, # Must always be 0
+                                              pretrained=weights)
+        base_output = base_model.output # NOT "outputs"! Should be singular!
+        droput_layer = tf.keras.layers.Dropout(rate=0.3)(base_output)
+        embeddings = MetricEmbedding(embedding_size)(droput_layer)
+        model = Model(inputs=base_model.input, outputs=embeddings)
+
     else:
         inputs = Input(input_shape, name='image_input')
         backbone = Backbone(model_type=model_type, use_imagenet=use_imagenet)(inputs)
