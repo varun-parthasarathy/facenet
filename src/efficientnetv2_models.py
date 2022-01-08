@@ -7,6 +7,7 @@ arXiv preprint arXiv:2104.00298.
 import os
 import functools
 import tensorflow as tf
+import tensorflow_addons as tfa
 from tensorflow import keras
 from tensorflow.keras import backend as K
 from tensorflow.keras.models import Model
@@ -143,26 +144,26 @@ FILE_HASH_DICT = {
     "v1-l2": {"noisy_student": "5fedc721febfca4b08b03d1f18a4a3ca"},
 }
 
-def get_activation_fn(features, act_fn):
+def get_activation_fn(act_fn):
     """Customized non-linear activation type."""
     if act_fn in ('silu', 'swish'):
-        return tf.nn.swish(features)
-    elif act_fn == 'silu_native':
-        return features * tf.sigmoid(features)
-    elif act_fn == 'hswish':
-        return features * tf.nn.relu6(features + 3) / 6
+        return tf.keras.activations.swish
+    # elif act_fn == 'hswish':
+    #     return features * tf.nn.relu6(features + 3) / 6
     elif act_fn == 'relu':
-        return tf.nn.relu(features)
+        return tf.nn.relu
     elif act_fn == 'relu6':
-        return tf.nn.relu6(features)
+        return tf.nn.relu6
     elif act_fn == 'elu':
-        return tf.nn.elu(features)
+        return tf.nn.elu
     elif act_fn == 'leaky_relu':
-        return tf.nn.leaky_relu(features)
+        return tf.nn.leaky_relu
     elif act_fn == 'selu':
-        return tf.nn.selu(features)
+        return tf.nn.selu
     elif act_fn == 'mish':
-        return features * tf.math.tanh(tf.math.softplus(features))
+        return tfa.activations.mish
+    elif act_fn == 'gelu':
+        return tfa.activations.gelu
     else:
         raise ValueError('Unsupported act_fn {}'.format(act_fn))
 
@@ -171,7 +172,7 @@ def get_act_fn(act_fn):
     if not act_fn:
         return tf.nn.silu
     if isinstance(act_fn, str):
-        return functools.partial(get_activation_fn, act_fn=act_fn)
+        return get_activation_fn(act_fn)
     return act_fn
 
 
