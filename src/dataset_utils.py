@@ -131,7 +131,7 @@ def generate_training_dataset(data_path, image_size, batch_size, crop_size, cach
         if preprocessor is not None:
             img = preprocessor.preprocess_input(img)
         else:
-            img = img / 255.
+            pass
         img = tf.image.random_crop(img, [crop_size, crop_size, 3])
         img = tf.image.random_flip_left_right(img)
         #img = tf.image.random_brightness(img, 0.2)
