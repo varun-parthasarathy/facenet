@@ -287,7 +287,7 @@ def EfficientNetV2(
     is_torch_mode=False,
     drop_connect_rate=0,
     classifier_activation="softmax",
-    include_preprocessing=False,
+    include_preprocessing=True,
     pretrained="imagenet",
     model_name="EfficientNetV2",
     kwargs=None,  # Not used, just receiving parameter
@@ -315,7 +315,7 @@ def EfficientNetV2(
             Rescaling = keras.layers.experimental.preprocessing.Rescaling
             Normalization = keras.layers.experimental.preprocessing.Normalization
         nn = Rescaling(1.0 / 255.0)(inputs)
-        nn = Normalization(mean=[0.485, 0.456, 0.406], variance=[0.229, 0.224, 0.225], axis=channel_axis)(nn)
+        nn = Normalization(mean=[0.485, 0.456, 0.406], variance=[0.229**2, 0.224**2, 0.225**2], axis=channel_axis)(nn)
     else:
         nn = inputs
     out_channel = _make_divisible(first_conv_filter, 8)
