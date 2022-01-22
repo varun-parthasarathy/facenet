@@ -17,6 +17,7 @@ from scipy.optimize import brentq
 from sklearn.model_selection import KFold
 from adaptive_triplet_loss import AdaptiveTripletLoss
 from custom_triplet_loss import TripletBatchHardLoss, TripletFocalLoss, TripletBatchHardV2Loss, AssortedTripletLoss, ConstellationLoss
+from custom_triplet_loss import HAP2S_ELoss, HAP2S_PLoss
 from model_utils import create_neural_network_v2
 import model_utils
 from tensorflow_similarity.losses import MultiSimilarityLoss
@@ -264,6 +265,10 @@ def main(weights_path, lfw_path, image_size, crop_size, model_type, loss_type,
         loss_obj = ['AssortedTripletLoss', AssortedTripletLoss]
     elif loss_type == 'CONSTELLATION':
         loss_obj = ['ConstellationLoss', ConstellationLoss]
+    elif loss_type == 'HAP2S_E':
+        loss_obj = ['HAP2S_ELoss', HAP2S_ELoss]
+    elif loss_type == 'HAP2S_P':
+        loss_obj = ['HAP2S_PLoss', HAP2S_PLoss]
     else:
         loss_obj = None
     if loss_obj is not None:

@@ -19,6 +19,7 @@ from tensorflow.keras.applications.inception_v3 import InceptionV3
 from tensorflow.keras.applications.inception_resnet_v2 import InceptionResNetV2
 from tensorflow.keras import mixed_precision
 from custom_triplet_loss import TripletBatchHardLoss, TripletFocalLoss, TripletBatchHardV2Loss, AssortedTripletLoss, ConstellationLoss
+from custom_triplet_loss import HAP2S_ELoss, HAP2S_PLoss
 from dataset_utils import generate_training_dataset, get_test_dataset, get_LFW_dataset, generate_training_dataset_v2
 from triplet_callbacks_and_metrics import RangeTestCallback, DecayMarginCallback, TripletLossMetrics, ToggleMetricEval
 from model_utils import create_neural_network_v2
@@ -240,6 +241,16 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                       beta=20,
                                       epsilon=margin,
                                       lmda=sigma if sigma < 1 else 0.5)
+    elif triplet_strategy == 'HAP2S_E':
+        loss_fn = HAP2S_ELoss(margin=margin,
+                              soft=soft,
+                              sigma=sigma,
+                              distance_metric=distance_metric)
+    elif triplet_strategy == 'HAP2S_P':
+        loss_fn = HAP2S_PLoss(margin=margin,
+                              soft=soft,
+                              alpha=sigma,
+                              distance_metric=distance_metric)
     else:
         loss_fn = TripletFocalLoss(margin=margin,
                                    sigma=sigma,
@@ -493,7 +504,8 @@ if __name__ == '__main__':
     parser.add_argument('--use_mixed_precision', action='store_true',
                         help='Use mixed precision for training. Can greatly reduce memory consumption')
     parser.add_argument('--triplet_strategy', type=str, default='FOCAL',
-                        choices=['VANILLA', 'BATCH_HARD', 'BATCH_HARD_V2', 'FOCAL', 'ADAPTIVE', 'ASSORTED', 'CONSTELLATION', 'MULTISIMILARITY'],
+                        choices=['VANILLA', 'BATCH_HARD', 'BATCH_HARD_V2', 'FOCAL', 'ADAPTIVE', 'ASSORTED', 
+                                 'CONSTELLATION', 'MULTISIMILARITY', 'HAP2S_E', 'HAP2S_P'],
                         help='Choice of triplet loss formulation. Default is FOCAL')
     parser.add_argument('--images_per_person', required=False, type=int, default=35,
                         help='Average number of images per class. Default is 35 (from MS1M cleaned + AsianCeleb)')

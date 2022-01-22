@@ -14,6 +14,7 @@ from tensorflow.keras.applications.inception_v3 import InceptionV3
 from tensorflow.keras.applications.inception_resnet_v2 import InceptionResNetV2
 from tensorflow.keras.mixed_precision import experimental as mixed_precision
 from custom_triplet_loss import TripletBatchHardLoss, TripletFocalLoss, TripletBatchHardV2Loss, AssortedTripletLoss, ConstellationLoss
+from custom_triplet_loss import HAP2S_ELoss, HAP2S_PLoss
 from tensorflow_similarity.losses import MultiSimilarityLoss
 from efficientnetv2_models import get_efficientnetv2_model
 
@@ -192,6 +193,10 @@ def create_neural_network_v2(model_type='resnet50', embedding_size=512, input_sh
                     loss_obj = ['AssortedTripletLoss', AssortedTripletLoss]
                 elif loss_type == 'CONSTELLATION':
                     loss_obj = ['ConstellationLoss', ConstellationLoss]
+                elif loss_type == 'HAP2S_E':
+                    loss_obj = ['HAP2S_ELoss', HAP2S_ELoss]
+                elif loss_type == 'HAP2S_P':
+                    loss_obj = ['HAP2S_PLoss', HAP2S_PLoss]
                 else:
                     loss_obj = None
                 if loss_obj is not None:
@@ -213,6 +218,10 @@ def create_neural_network_v2(model_type='resnet50', embedding_size=512, input_sh
                     loss_obj = ['AssortedTripletLoss', loss_fn]
                 elif loss_type == 'CONSTELLATION':
                     loss_obj = ['ConstellationLoss', ConstellationLoss]
+                elif loss_type == 'HAP2S_E':
+                    loss_obj = ['HAP2S_ELoss', HAP2S_ELoss]
+                elif loss_type == 'HAP2S_P':
+                    loss_obj = ['HAP2S_PLoss', HAP2S_PLoss]
                 else:
                     loss_obj = None
                 if loss_obj is not None:
