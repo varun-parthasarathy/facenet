@@ -1,4 +1,5 @@
 import os
+import random
 import tensorflow as tf
 import tensorflow_addons as tfa
 from tensorflow.keras.models import Model
@@ -40,6 +41,157 @@ class MetricEmbedding(tf.keras.layers.Layer):
 
     def get_config(self):
         return {'unit': self.unit}
+
+
+class SAMModel(tf.keras.Model):
+    def __init__(self, base_model, rho=0.05):
+        super(SAMModel, self).__init__()
+        self.base_model = base_model
+        self.rho = rho
+
+    def train_step(self, data):
+        (images, labels) = data
+        e_ws = []
+        with tf.GradientTape() as tape:
+            predictions = self.base_model(images)
+            loss = self.compiled_loss(labels, predictions)
+        trainable_params = self.base_model.trainable_variables
+        gradients = tape.gradient(loss, trainable_params)
+        grad_norm = self._grad_norm(gradients)
+        scale = self.rho / (grad_norm + 1e-12)
+
+        for (grad, param) in zip(gradients, trainable_params):
+            e_w = grad * scale
+            param.assign_add(e_w)
+            e_ws.append(e_w)
+
+        with tf.GradientTape() as tape:
+            predictions = self.base_model(images)
+            loss = self.compiled_loss(labels, predictions)    
+        
+        sam_gradients = tape.gradient(loss, trainable_params)
+        for (param, e_w) in zip(trainable_params, e_ws):
+            param.assign_sub(e_w)
+        
+        self.optimizer.apply_gradients(
+            zip(sam_gradients, trainable_params))
+        
+        self.compiled_metrics.update_state(labels, predictions)
+        return {m.name: m.result() for m in self.metrics}
+
+    def test_step(self, data):
+        (images, labels) = data
+        predictions = self.base_model(images, training=False)
+        loss = self.compiled_loss(labels, predictions)
+        self.compiled_metrics.update_state(labels, predictions)
+        return {m.name: m.result() for m in self.metrics}
+
+    def _grad_norm(self, gradients):
+        norm = tf.norm(
+            tf.stack([
+                tf.norm(grad) for grad in gradients if grad is not None
+            ])
+        )
+        return norm
+
+
+class ESAMModel(tf.keras.Model):
+    '''
+    From Efficient Sharpness-aware Minimization for Improved Training of Neural Networks
+    See https://arxiv.org/pdf/2110.03141.pdf
+    This provides performance and efficiency improvements over regular SAM. This class
+    overrides the default train step, making it easier to use SAM for training other models
+    since a custom training loop is no longer required.
+    '''
+    def __init__(self, base_model, rho=0.05, beta=0.5, gamma=0.5, adaptive=False):
+        super(SAMModel, self).__init__()
+        self.base_model = base_model
+        self.rho = rho
+        self.beta = beta
+        self.gamma = gamma
+        self.adaptive = adaptive
+
+    def train_step(self, data):
+        (images, labels) = data
+        e_ws = []
+        with tf.GradientTape() as tape:
+            predictions = self.base_model(images)
+            loss = self.compiled_loss(labels, predictions)
+        loss_before = loss.copy()
+        trainable_params = self.base_model.trainable_variables
+        gradients = tape.gradient(loss, trainable_params)
+        grad_norm = self._grad_norm(gradients, trainable_params)
+        scale = self.rho / (grad_norm + 1e-7) / self.beta
+
+        for (grad, param) in zip(gradients, trainable_params):
+            if grad is None:
+                continue
+            if self.adaptive is True:
+                e_w = tf.pow(param, 2) * grad * scale
+            else:
+                e_w = grad * scale
+            param.assign_add(e_w)
+            e_ws.append(e_w)
+
+        with tf.GradientTape() as tape:
+            predictions = self.base_model(images)
+            loss_after = self.compiled_loss(labels, predictions)
+
+        instance_sharpness = loss_after - loss_before
+        prob = self.gamma
+        if prob >= 0.99:
+            indices = range(len(targets))
+        else:
+            position = int(len(targets) * prob)
+            cutoff, _ = tf.math.top_k(instance_sharpness, position)
+            cutoff = cutoff[-1]
+            indices = [instance_sharpness > cutoff]
+
+        with tf.GradientTape() as tape:
+            predictions = self.base_model(images[indices])
+            loss = self.compiled_loss(labels[indices], predictions)
+        
+        sam_gradients = tape.gradient(loss, trainable_params)
+        is_requires_grad = []
+        for (param, e_w) in zip(trainable_params, e_ws):
+            param.assign_sub(e_w)
+            if random.random() > self.beta:
+                is_requires_grad.append(False)
+            else:
+                is_requires_grad.append(True)
+        new_grads, vars_to_update = sam_gradients, trainable_params
+        for g, p, requires_grad in zip(sam_gradients, trainable_params, is_requires_grad):
+            if requires_grad is False:
+                new_grads.remove(g)
+                vars_to_update.remove(p)
+        
+        self.optimizer.apply_gradients(
+            zip(new_grads, vars_to_update))
+        
+        self.compiled_metrics.update_state(labels, predictions)
+        return {m.name: m.result() for m in self.metrics}
+
+    def test_step(self, data):
+        (images, labels) = data
+        predictions = self.base_model(images, training=False)
+        loss = self.compiled_loss(labels, predictions)
+        self.compiled_metrics.update_state(labels, predictions)
+        return {m.name: m.result() for m in self.metrics}
+
+    def _grad_norm(self, gradients, params):
+        if self.adaptive is True:
+            norm = tf.norm(
+                tf.stack([
+                    tf.norm(tf.math.abs(param) * grad) for grad, param in zip(gradients, params) if grad is not None
+                ])
+            )
+        else:
+            norm = tf.norm(
+                tf.stack([
+                    tf.norm(grad) for grad in gradients if grad is not None
+                ])
+            )
+        return norm
 
 
 def Backbone(model_type='resnet50', use_imagenet=True):
@@ -126,7 +278,7 @@ def OutputLayer(embedding_size=512, name='OutputLayer', model_type='resnet50'):
 
 def create_neural_network_v2(model_type='resnet50', embedding_size=512, input_shape=[260, 260, 3], 
                              weights_path='', loss_type='ADAPTIVE', loss_fn=None, recompile=False, 
-                             use_imagenet=True):
+                             use_imagenet=True, sam_type='null'):
 
     assert input_shape is not None, '[ERROR] Input shape not specified correctly!'
     assert len(input_shape) == 3, '[ERROR] Input shape must be of the form [height, width, channels]'
@@ -243,5 +395,12 @@ def create_neural_network_v2(model_type='resnet50', embedding_size=512, input_sh
                 return model, False
     else:
         print('[WARNING] Could not load weights. Using random initialization instead')
+
+    if sam_type == 'SAM':
+        model = SAMModel(model)
+    elif sam_type == 'ESAM':
+        model = SAMModel(model)
+    else:
+        pass
     
     return model, compiled

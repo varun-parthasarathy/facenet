@@ -138,7 +138,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                 sigma=0.3, decay_margin_rate=0.0, use_lfw=True, target_margin=0.2, distributed=False,
                 eager_execution=False, weights_path='', checkpoint_interval=5000, use_metrics=False,
                 step_size=6000, recompile=False, steps_per_epoch=None, equisample=False, loss_to_load='',
-                use_imagenet=False):
+                use_imagenet=False, sam_type='null'):
 
     if use_tpu is True:
         assert tpu_name is not None, '[ERROR] TPU name must be specified'
@@ -293,7 +293,8 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                                            loss_fn=loss_fn,
                                                            recompile=recompile,
                                                            input_shape=[crop_size, crop_size, 3],
-                                                           use_imagenet=use_imagenet)
+                                                           use_imagenet=use_imagenet,
+                                                           sam_type=sam_type)
                 assert model is not None, '[ERROR] There was a problem while loading the pre-trained weights'
                 if compiled is False:
                     print('[INFO] Recompiling model using passed optimizer and loss arguments')
@@ -310,7 +311,8 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                                            loss_fn=loss_fn,
                                                            recompile=recompile,
                                                            input_shape=[crop_size, crop_size, 3],
-                                                           use_imagenet=use_imagenet)
+                                                           use_imagenet=use_imagenet,
+                                                           sam_type=sam_type)
                 opt = get_optimizer(optimizer_name=optimizer,
                                     lr_schedule=1e-5,
                                     weight_decay=weight_decay) # Optimizer must be created within scope!
@@ -329,7 +331,8 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                                        loss_fn=loss_fn,
                                                        recompile=recompile,
                                                        input_shape=[crop_size, crop_size, 3],
-                                                       use_imagenet=use_imagenet)
+                                                       use_imagenet=use_imagenet,
+                                                       sam_type=sam_type)
             assert model is not None, '[ERROR] There was a problem while loading the pre-trained weights'
             if compiled is False:
                 print('[INFO] Recompiling model using passed optimizer and loss arguments')
@@ -383,7 +386,8 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                                            loss_fn=loss_fn,
                                                            recompile=recompile,
                                                            input_shape=[crop_size, crop_size, 3],
-                                                           use_imagenet=use_imagenet)
+                                                           use_imagenet=use_imagenet,
+                                                           sam_type=sam_type)
                 assert model is not None, '[ERROR] There was a problem in loading the pre-trained weights'
                 if compiled is False:
                     print('[INFO] Recompiling model using passed optimizer and loss arguments')
@@ -400,7 +404,8 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                                            loss_fn=loss_fn,
                                                            recompile=recompile,
                                                            input_shape=[crop_size, crop_size, 3],
-                                                           use_imagenet=use_imagenet)
+                                                           use_imagenet=use_imagenet,
+                                                           sam_type=sam_type)
                 opt = get_optimizer(optimizer_name=optimizer,
                                     lr_schedule=lr_schedule if lr_schedule_name not in ['triangular2', 'triangular'] else init_lr,
                                     weight_decay=weight_decay) # Optimizer must be created within scope!
@@ -419,7 +424,8 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                                        loss_fn=loss_fn,
                                                        recompile=recompile,
                                                        input_shape=[crop_size, crop_size, 3],
-                                                       use_imagenet=use_imagenet)
+                                                       use_imagenet=use_imagenet,
+                                                       sam_type=sam_type)
             assert model is not None, '[ERROR] There was a problem in loading the pre-trained weights'
             if compiled is False:
                 print('[INFO] Recompiling model using passed optimizer and loss arguments')
@@ -547,6 +553,8 @@ if __name__ == '__main__':
                         help='Choice of triplet loss object for loading models. Default is FOCAL')
     parser.add_argument('--use_imagenet', action='store_true',
                         help='Use pre-trained ImageNet weights')
+    parser.add_argument('--sam_type', type=str, default='null', choices=['null', 'SAM', 'ESAM'],
+                        help='Use Sharpness-Aware Minimization enabled models for training. Training will be slower as a result')
 
     args = vars(parser.parse_args())
 
@@ -589,4 +597,5 @@ if __name__ == '__main__':
                 steps_per_epoch=args['steps_per_epoch'],
                 equisample=args['equisample'],
                 loss_to_load=args['loss_to_load'],
-                use_imagenet=args['use_imagenet'])
+                use_imagenet=args['use_imagenet'],
+                sam_type=args['sam_type'])
