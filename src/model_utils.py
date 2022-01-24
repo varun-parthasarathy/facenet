@@ -398,8 +398,8 @@ def create_neural_network_v2(model_type='resnet50', embedding_size=512, input_sh
 
     if sam_type == 'SAM':
         model = SAMModel(model)
-    elif sam_type == 'ESAM':
-        model = SAMModel(model)
+    # elif sam_type == 'ESAM':
+    #     model = ESAMModel(model)
     else:
         pass
     
