@@ -29,7 +29,7 @@ class MetricEmbedding(tf.keras.layers.Layer):
             to a point at the expense of making search slower.
         """
         self.unit = unit
-        self.dense = Dense(unit)
+        self.dense = Dense(unit, dtype=tf.float32)
         super().__init__()
         # FIXME: enforce the shape
         # self.input_spec = rank2
