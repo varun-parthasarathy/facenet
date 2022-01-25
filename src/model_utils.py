@@ -328,6 +328,13 @@ def create_neural_network_v2(model_type='resnet50', embedding_size=512, input_sh
     model.summary()
     compiled = False
 
+    if sam_type == 'SAM':
+        model = SAMModel(model)
+    # elif sam_type == 'ESAM':
+    #     model = ESAMModel(model)
+    else:
+        pass
+
     if len(weights_path) > 1 and os.path.exists(weights_path):
         print('[INFO] Attempting to load weights from most recently saved checkpoint')
         loss_obj = None
@@ -396,11 +403,5 @@ def create_neural_network_v2(model_type='resnet50', embedding_size=512, input_sh
     else:
         print('[WARNING] Could not load weights. Using random initialization instead')
 
-    if sam_type == 'SAM':
-        model = SAMModel(model)
-    # elif sam_type == 'ESAM':
-    #     model = ESAMModel(model)
-    else:
-        pass
     
     return model, compiled
