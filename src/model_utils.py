@@ -61,6 +61,8 @@ class SAMModel(tf.keras.Model):
         scale = self.rho / (grad_norm + 1e-12)
 
         for (grad, param) in zip(gradients, trainable_params):
+            if grad is None or param is None:
+                continue
             e_w = grad * scale
             param.assign_add(e_w)
             e_ws.append(e_w)
