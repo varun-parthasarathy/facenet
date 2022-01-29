@@ -70,6 +70,7 @@ def triplet_focal_loss(
     sigma: FloatTensorLike = 0.3,
     soft: bool = False,
     distance_metric: Union[str, Callable] = "L2",
+    reduce_loss: bool = True
 ) -> tf.Tensor:
     """Computes the triplet focal loss with hard negative and hard positive mining.
     Args:
@@ -152,7 +153,8 @@ def triplet_focal_loss(
         triplet_loss = tf.maximum(p_hard - n_hard + margin, 0.0)
 
     # Get final mean triplet loss
-    triplet_loss = tf.reduce_mean(triplet_loss)
+    if reduce_loss is True or reduce_loss is None:
+        triplet_loss = tf.reduce_mean(triplet_loss)
 
     if convert_to_float32:
         return tf.cast(triplet_loss, embeddings.dtype)
@@ -168,6 +170,7 @@ def triplet_batch_hard_loss(
     margin: FloatTensorLike = 1.0,
     soft: bool = False,
     distance_metric: Union[str, Callable] = "L2",
+    reduce_loss: bool = True
 ) -> tf.Tensor:
     """Computes the triplet loss with hard negative and hard positive mining.
     Args:
@@ -249,7 +252,8 @@ def triplet_batch_hard_loss(
         triplet_loss = tf.maximum(hard_positives - hard_negatives + margin, 0.0)
 
     # Get final mean triplet loss
-    triplet_loss = tf.reduce_mean(triplet_loss)
+    if reduce_loss is True or reduce_loss is None:
+        triplet_loss = tf.reduce_mean(triplet_loss)
 
     if convert_to_float32:
         return tf.cast(triplet_loss, embeddings.dtype)
@@ -264,6 +268,7 @@ def assorted_triplet_loss(
     focal: bool = False,
     sigma: FloatTensorLike = 0.3,
     distance_metric: Union[str, Callable] = "L2",
+    reduce_loss: bool = True
 ) -> tf.Tensor:
     """Computes assorted triplet loss with hard negative and hard positive mining.
     See https://arxiv.org/pdf/2007.02200.pdf
@@ -355,7 +360,8 @@ def assorted_triplet_loss(
     triplet_loss = tf.maximum(hard_positives - hard_negatives + margin, 0.0)
 
     # Get final mean triplet loss
-    triplet_loss = tf.reduce_mean(triplet_loss)
+    if reduce_loss is True or reduce_loss is None:
+        triplet_loss = tf.reduce_mean(triplet_loss)
 
     if convert_to_float32:
         return tf.cast(triplet_loss, embeddings.dtype)
@@ -370,6 +376,7 @@ def triplet_batch_hard_v2_loss(
     margin2: FloatTensorLike = 0.01,
     beta: FloatTensorLike = 0.002,
     distance_metric: Union[str, Callable] = "L2",
+    reduce_loss: bool = True
 ) -> tf.Tensor:
     """Computes the triplet loss with hard negative and hard positive mining.
     Args:
@@ -450,7 +457,8 @@ def triplet_batch_hard_v2_loss(
                                               tf.maximum(hard_positives, margin2), beta)
 
     # Get final mean triplet loss
-    triplet_loss = tf.reduce_mean(triplet_loss)
+    if reduce_loss is True or reduce_loss is None:
+        triplet_loss = tf.reduce_mean(triplet_loss)
 
     if convert_to_float32:
         return tf.cast(triplet_loss, embeddings.dtype)
@@ -494,6 +502,7 @@ class TripletFocalLoss(LossFunctionWrapper):
         sigma: FloatTensorLike = 0.3,
         soft: bool = False,
         distance_metric: Union[str, Callable] = "L2",
+        reduce_loss: bool = True,
         name: Optional[str] = None, **kwargs
     ):
         super().__init__(triplet_focal_loss,
@@ -502,7 +511,8 @@ class TripletFocalLoss(LossFunctionWrapper):
                          margin = margin,
                          sigma = sigma,
                          soft = soft,
-                         distance_metric = distance_metric)
+                         distance_metric = distance_metric,
+                         reduce_loss = reduce_loss)
 
 
 class TripletBatchHardLoss(LossFunctionWrapper):
@@ -541,6 +551,7 @@ class TripletBatchHardLoss(LossFunctionWrapper):
         margin: FloatTensorLike = 1.0,
         soft: bool = False,
         distance_metric: Union[str, Callable] = "L2",
+        reduce_loss: bool = True,
         name: Optional[str] = None,
         **kwargs
     ):
@@ -549,7 +560,8 @@ class TripletBatchHardLoss(LossFunctionWrapper):
                          reduction = tf.keras.losses.Reduction.NONE,
                          margin = margin,
                          soft = soft,
-                         distance_metric = distance_metric)
+                         distance_metric = distance_metric,
+                         reduce_loss = reduce_loss)
 
 
 class TripletBatchHardV2Loss(LossFunctionWrapper):
@@ -590,6 +602,7 @@ class TripletBatchHardV2Loss(LossFunctionWrapper):
         margin2: FloatTensorLike = 0.01,
         beta: FloatTensorLike = 0.002,
         distance_metric: Union[str, Callable] = "L2",
+        reduce_loss: bool = True,
         name: Optional[str] = None,
         **kwargs
     ):
@@ -599,7 +612,8 @@ class TripletBatchHardV2Loss(LossFunctionWrapper):
                          margin1 = margin1,
                          margin2 = margin2,
                          beta = beta,
-                         distance_metric = distance_metric)
+                         distance_metric = distance_metric,
+                         reduce_loss = reduce_loss)
 
 
 class AssortedTripletLoss(LossFunctionWrapper):
@@ -645,6 +659,7 @@ class AssortedTripletLoss(LossFunctionWrapper):
         sigma: FloatTensorLike = 0.3,
         focal: bool = False,
         distance_metric: Union[str, Callable] = "L2",
+        reduce_loss: bool = True,
         name: Optional[str] = None, **kwargs
     ):
         super().__init__(assorted_triplet_loss,
@@ -653,7 +668,8 @@ class AssortedTripletLoss(LossFunctionWrapper):
                          margin = margin,
                          sigma = sigma,
                          focal = focal,
-                         distance_metric = distance_metric)
+                         distance_metric = distance_metric,
+                         reduce_loss = reduce_loss)
 
 
 def _get_triplet_mask(labels):
@@ -735,7 +751,9 @@ def constellation_loss(labels, embeddings, k, BATCH_SIZE):
     ctl_loss = tf.math.log(ctl_loss)
 
     # # Get final mean constellation loss and divide due to very large loss value
-    ctl_loss = tf.reduce_sum(ctl_loss) / 1000.
+    # ctl_loss = tf.reduce_sum(ctl_loss) / 1000.
+    if reduce_loss is True or reduce_loss is None:
+        ctl_loss = tf.reduce_mean(ctl_loss)
 
     return ctl_loss
 
@@ -751,13 +769,15 @@ class ConstellationLoss(LossFunctionWrapper):
     def __init__(
         self, k: int = 4, 
         batch_size: int = 128,
+        reduce_loss: bool = True,
         name: Optional[str] = None, **kwargs
     ):
         super().__init__(constellation_loss,
                          name = name, 
                          reduction = tf.keras.losses.Reduction.NONE,
                          k = k,
-                         BATCH_SIZE = batch_size // k)
+                         BATCH_SIZE = batch_size // k,
+                         reduce_loss = reduce_loss)
 
 
 @tf.function
@@ -768,6 +788,7 @@ def HAP2S_E_loss(
     sigma: FloatTensorLike = 0.5,
     soft: bool = False,
     distance_metric: Union[str, Callable] = "L2",
+    reduce_loss: bool = True
 ) -> tf.Tensor:
 
     labels, embeddings = y_true, y_pred
@@ -829,7 +850,8 @@ def HAP2S_E_loss(
         triplet_loss = tf.maximum(normed_weighted_pdist - normed_weighted_ndist + margin, 0.0)
 
     # Get final mean triplet loss
-    triplet_loss = tf.reduce_mean(triplet_loss)
+    if reduce_loss is True or reduce_loss is None:
+        triplet_loss = tf.reduce_mean(triplet_loss)
 
     if convert_to_float32:
         return tf.cast(triplet_loss, embeddings.dtype)
@@ -845,6 +867,7 @@ def HAP2S_P_loss(
     alpha: FloatTensorLike = 10.0,
     soft: bool = False,
     distance_metric: Union[str, Callable] = "L2",
+    reduce_loss: bool = True
 ) -> tf.Tensor:
 
     labels, embeddings = y_true, y_pred
@@ -906,7 +929,8 @@ def HAP2S_P_loss(
         triplet_loss = tf.maximum(normed_weighted_pdist - normed_weighted_ndist + margin, 0.0)
 
     # Get final mean triplet loss
-    triplet_loss = tf.reduce_mean(triplet_loss)
+    if reduce_loss is True or reduce_loss is None:
+        triplet_loss = tf.reduce_mean(triplet_loss)
 
     if convert_to_float32:
         return tf.cast(triplet_loss, embeddings.dtype)
@@ -951,6 +975,7 @@ class HAP2S_ELoss(LossFunctionWrapper):
         sigma: FloatTensorLike = 0.5,
         soft: bool = False,
         distance_metric: Union[str, Callable] = "L2",
+        reduce_loss: bool = True,
         name: Optional[str] = None, **kwargs
     ):
         super().__init__(HAP2S_E_loss,
@@ -959,7 +984,8 @@ class HAP2S_ELoss(LossFunctionWrapper):
                          margin = margin,
                          sigma = sigma,
                          soft = soft,
-                         distance_metric = distance_metric)
+                         distance_metric = distance_metric,
+                         reduce_loss = reduce_loss)
 
 
 class HAP2S_PLoss(LossFunctionWrapper):
@@ -999,6 +1025,7 @@ class HAP2S_PLoss(LossFunctionWrapper):
         alpha: FloatTensorLike = 10.0,
         soft: bool = False,
         distance_metric: Union[str, Callable] = "L2",
+        reduce_loss: bool = True,
         name: Optional[str] = None, **kwargs
     ):
         super().__init__(HAP2S_P_loss,
@@ -1007,4 +1034,5 @@ class HAP2S_PLoss(LossFunctionWrapper):
                          margin = margin,
                          alpha = alpha,
                          soft = soft,
-                         distance_metric = distance_metric)
+                         distance_metric = distance_metric,
+                         reduce_loss = reduce_loss)

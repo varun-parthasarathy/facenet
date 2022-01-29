@@ -105,28 +105,30 @@ class ESAMModel(tf.keras.Model):
     overrides the default train step, making it easier to use SAM for training other models
     since a custom training loop is no longer required.
     '''
-    def __init__(self, base_model, rho=0.05, beta=0.5, gamma=0.5, adaptive=False):
-        super(SAMModel, self).__init__()
+    def __init__(self, base_model, rho=0.05, beta=0.5, gamma=0.5, adaptive=False, loss_fn=None):
+        super(ESAMModel, self).__init__()
         self.base_model = base_model
         self.rho = rho
         self.beta = beta
         self.gamma = gamma
         self.adaptive = adaptive
+        self.loss_fn = loss_fn
+        assert self.loss_fn is not None, '[ERROR] No loss object received. Loss object must have call() implemented'
 
     def train_step(self, data):
-        (images, labels) = data
+        images, labels = data
         e_ws = []
         with tf.GradientTape() as tape:
             predictions = self.base_model(images)
             loss = self.compiled_loss(labels, predictions)
-        loss_before = loss.copy()
+        loss_before = self.loss_fn.call(labels, predictions)
         trainable_params = self.base_model.trainable_variables
         gradients = tape.gradient(loss, trainable_params)
-        grad_norm = self._grad_norm(gradients, trainable_params)
-        scale = self.rho / (grad_norm + 1e-7) / self.beta
+        grad_norm = self._grad_norm(gradients)
+        scale = (self.rho / (grad_norm + 1e-7)) / self.beta
 
         for (grad, param) in zip(gradients, trainable_params):
-            if grad is None:
+            if grad is None or param is None:
                 continue
             if self.adaptive is True:
                 e_w = tf.pow(param, 2) * grad * scale
@@ -135,40 +137,36 @@ class ESAMModel(tf.keras.Model):
             param.assign_add(e_w)
             e_ws.append(e_w)
 
-        with tf.GradientTape() as tape:
-            predictions = self.base_model(images)
-            loss_after = self.compiled_loss(labels, predictions)
+        loss_after = self.loss_fn.call(labels, self.base_model(images))
 
         instance_sharpness = loss_after - loss_before
-        prob = self.gamma
-        if prob >= 0.99:
-            indices = range(len(targets))
+        range_val = tf.cast(tf.shape(labels)[0], tf.float32)
+        if self.gamma >= 0.99:
+            indices = tf.range(tf.cast(range_val, tf.int32))
         else:
-            position = int(len(targets) * prob)
+            position = tf.cast(range_val * self.gamma, tf.int32)
             cutoff, _ = tf.math.top_k(instance_sharpness, position)
             cutoff = cutoff[-1]
-            indices = [instance_sharpness > cutoff]
+            indices = tf.where(tf.math.greater(instance_sharpness, cutoff))
+            indices = tf.reshape(indices, (tf.shape(indices)[0],))
 
         with tf.GradientTape() as tape:
-            predictions = self.base_model(images[indices])
-            loss = self.compiled_loss(labels[indices], predictions)
+            predictions = self.base_model(tf.gather(images, indices))
+            loss = self.compiled_loss(tf.gather(labels, indices), predictions)
         
         sam_gradients = tape.gradient(loss, trainable_params)
-        is_requires_grad = []
-        for (param, e_w) in zip(trainable_params, e_ws):
+        new_grads = []
+        new_params = []
+        for (param, e_w, g) in zip(trainable_params, e_ws, sam_gradients):
             param.assign_sub(e_w)
             if random.random() > self.beta:
-                is_requires_grad.append(False)
+                pass
             else:
-                is_requires_grad.append(True)
-        new_grads, vars_to_update = sam_gradients, trainable_params
-        for g, p, requires_grad in zip(sam_gradients, trainable_params, is_requires_grad):
-            if requires_grad is False:
-                new_grads.remove(g)
-                vars_to_update.remove(p)
+                new_grads.append(g)
+                new_params.append(param)
         
         self.optimizer.apply_gradients(
-            zip(new_grads, vars_to_update))
+            zip(new_grads, new_params))
         
         self.compiled_metrics.update_state(labels, predictions)
         return {m.name: m.result() for m in self.metrics}
@@ -180,11 +178,11 @@ class ESAMModel(tf.keras.Model):
         self.compiled_metrics.update_state(labels, predictions)
         return {m.name: m.result() for m in self.metrics}
 
-    def _grad_norm(self, gradients, params):
+    def _grad_norm(self, gradients):
         if self.adaptive is True:
             norm = tf.norm(
                 tf.stack([
-                    tf.norm(tf.math.abs(param) * grad) for grad, param in zip(gradients, params) if grad is not None
+                    tf.norm(tf.math.abs(param) * grad) for grad, param in zip(gradients, params) if (grad is not None and param is not None)
                 ])
             )
         else:
@@ -280,7 +278,7 @@ def OutputLayer(embedding_size=512, name='OutputLayer', model_type='resnet50'):
 
 def create_neural_network_v2(model_type='resnet50', embedding_size=512, input_shape=[260, 260, 3], 
                              weights_path='', loss_type='ADAPTIVE', loss_fn=None, recompile=False, 
-                             use_imagenet=True, sam_type='null'):
+                             use_imagenet=True, sam_type='null', loss_args={}):
 
     assert input_shape is not None, '[ERROR] Input shape not specified correctly!'
     assert len(input_shape) == 3, '[ERROR] Input shape must be of the form [height, width, channels]'
@@ -332,8 +330,26 @@ def create_neural_network_v2(model_type='resnet50', embedding_size=512, input_sh
 
     if sam_type == 'SAM':
         model = SAMModel(model)
-    # elif sam_type == 'ESAM':
-    #     model = ESAMModel(model)
+    elif sam_type == 'ESAM':
+        if loss_type == 'ADAPTIVE':
+            loss_object = AdaptiveTripletLoss(reduce_loss=False, **loss_args)
+        elif loss_type == 'FOCAL':
+            loss_object = TripletFocalLoss(reduce_loss=False, **loss_args)
+        elif loss_type == 'BATCH_HARD':
+            loss_object = TripletBatchHardLoss(reduce_loss=False, **loss_args)
+        elif loss_type == 'BATCH_HARD_V2':
+            loss_object = TripletBatchHardV2Loss(reduce_loss=False, **loss_args)
+        elif loss_type == 'ASSORTED':
+            loss_object = AssortedTripletLoss(reduce_loss=False, **loss_args)
+        elif loss_type == 'CONSTELLATION':
+            loss_object = ConstellationLoss(reduce_loss=False, **loss_args)
+        elif loss_type == 'HAP2S_E':
+            loss_object = HAP2S_ELoss(reduce_loss=False, **loss_args)
+        elif loss_type == 'HAP2S_P':
+            loss_object = HAP2S_PLoss(reduce_loss=False, **loss_args)
+        else:
+            loss_object = None
+        model = ESAMModel(model, loss_fn=loss_object)
     else:
         pass
 
@@ -378,11 +394,11 @@ def create_neural_network_v2(model_type='resnet50', embedding_size=512, input_sh
                 elif loss_type == 'ASSORTED':
                     loss_obj = ['AssortedTripletLoss', loss_fn]
                 elif loss_type == 'CONSTELLATION':
-                    loss_obj = ['ConstellationLoss', ConstellationLoss]
+                    loss_obj = ['ConstellationLoss', loss_fn]
                 elif loss_type == 'HAP2S_E':
-                    loss_obj = ['HAP2S_ELoss', HAP2S_ELoss]
+                    loss_obj = ['HAP2S_ELoss', loss_fn]
                 elif loss_type == 'HAP2S_P':
-                    loss_obj = ['HAP2S_PLoss', HAP2S_PLoss]
+                    loss_obj = ['HAP2S_PLoss', loss_fn]
                 else:
                     loss_obj = None
                 if loss_obj is not None:
