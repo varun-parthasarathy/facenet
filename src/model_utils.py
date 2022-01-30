@@ -124,7 +124,7 @@ class ESAMModel(tf.keras.Model):
         loss_before = self.loss_fn.call(labels, predictions)
         trainable_params = self.base_model.trainable_variables
         gradients = tape.gradient(loss, trainable_params)
-        grad_norm = self._grad_norm(gradients)
+        grad_norm = self._grad_norm(gradients, trainable_params)
         scale = (self.rho / (grad_norm + 1e-7)) / self.beta
 
         for (grad, param) in zip(gradients, trainable_params):
@@ -178,7 +178,7 @@ class ESAMModel(tf.keras.Model):
         self.compiled_metrics.update_state(labels, predictions)
         return {m.name: m.result() for m in self.metrics}
 
-    def _grad_norm(self, gradients):
+    def _grad_norm(self, gradients, trainable_params):
         if self.adaptive is True:
             norm = tf.norm(
                 tf.stack([
