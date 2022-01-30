@@ -128,7 +128,7 @@ def OutputLayer(embedding_size=512, name='OutputLayer', model_type='resnet50'):
 
 def create_neural_network_v2(model_type='resnet50', embedding_size=512, input_shape=[260, 260, 3], 
                              weights_path='', loss_type='ADAPTIVE', loss_fn=None, recompile=False, 
-                             use_imagenet=True, sam_type='null', loss_args={}):
+                             use_imagenet=True, sam_type='null'):
 
     assert input_shape is not None, '[ERROR] Input shape not specified correctly!'
     assert len(input_shape) == 3, '[ERROR] Input shape must be of the form [height, width, channels]'
@@ -166,42 +166,27 @@ def create_neural_network_v2(model_type='resnet50', embedding_size=512, input_sh
         base_output = base_model.output # NOT "outputs"! Should be singular!
         droput_layer = tf.keras.layers.Dropout(rate=0.3)(base_output)
         embeddings = MetricEmbedding(embedding_size)(droput_layer)
-        model = Model(inputs=base_model.input, outputs=embeddings)
+        if sam_type == 'SAM':
+            model = SAMModel(inputs=base_model.input, outputs=embeddings)
+        elif sam_type == 'ESAM':
+            model = ESAMModel(inputs=base_model.input, outputs=embeddings)
+        else:
+            model = Model(inputs=base_model.input, outputs=embeddings)
 
     else:
         inputs = Input(input_shape, name='image_input')
         backbone = Backbone(model_type=model_type, use_imagenet=use_imagenet)(inputs)
         embeddings = OutputLayer(embedding_size=embedding_size, model_type=model_type)(backbone)
-        model = Model(inputs=inputs, outputs=embeddings)
+        if sam_type == 'SAM':
+            model = SAMModel(inputs=inputs, outputs=embeddings)
+        elif sam_type == 'ESAM':
+            model = ESAMModel(inputs=inputs, outputs=embeddings)
+        else:
+            model = Model(inputs=inputs, outputs=embeddings)
     
     assert model is not None, '[ERROR] Could not create model!'
     model.summary()
     compiled = False
-
-    if sam_type == 'SAM':
-        model = SAMModel(model)
-    elif sam_type == 'ESAM':
-        if loss_type == 'ADAPTIVE':
-            loss_object = AdaptiveTripletLoss(reduce_loss=False, **loss_args)
-        elif loss_type == 'FOCAL':
-            loss_object = TripletFocalLoss(reduce_loss=False, **loss_args)
-        elif loss_type == 'BATCH_HARD':
-            loss_object = TripletBatchHardLoss(reduce_loss=False, **loss_args)
-        elif loss_type == 'BATCH_HARD_V2':
-            loss_object = TripletBatchHardV2Loss(reduce_loss=False, **loss_args)
-        elif loss_type == 'ASSORTED':
-            loss_object = AssortedTripletLoss(reduce_loss=False, **loss_args)
-        elif loss_type == 'CONSTELLATION':
-            loss_object = ConstellationLoss(reduce_loss=False, **loss_args)
-        elif loss_type == 'HAP2S_E':
-            loss_object = HAP2S_ELoss(reduce_loss=False, **loss_args)
-        elif loss_type == 'HAP2S_P':
-            loss_object = HAP2S_PLoss(reduce_loss=False, **loss_args)
-        else:
-            loss_object = None
-        model = ESAMModel(model, loss_fn=loss_object)
-    else:
-        pass
 
     if len(weights_path) > 1 and os.path.exists(weights_path):
         print('[INFO] Attempting to load weights from most recently saved checkpoint')
@@ -271,5 +256,8 @@ def create_neural_network_v2(model_type='resnet50', embedding_size=512, input_sh
     else:
         print('[WARNING] Could not load weights. Using random initialization instead')
 
+    if sam_type in ['SAM', 'ESAM']:
+        compiled = False
+        print('[WARNING] SAM/ESAM models do not save optimizer state and should be recompiled on every run')
     
     return model, compiled

@@ -200,29 +200,24 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
         test_dataset = None
 
     run_eagerly = eager_execution if eager_execution is not None else False
-    loss_args = {}
     if triplet_strategy == 'VANILLA':
         loss_fn = tfa.losses.TripletSemiHardLoss(margin=margin)
-        loss_args = {'margin':margin}
         print('[INFO] Using vanilla triplet loss')
     elif triplet_strategy == 'BATCH_HARD':
         loss_fn = TripletBatchHardLoss(margin=margin,
                                        soft=soft,
                                        distance_metric=distance_metric)
-        loss_args = {'margin':margin, 'soft':soft, 'distance_metric':distance_metric}
         print('[INFO] Using batch-hard strategy.')
     elif triplet_strategy == 'BATCH_HARD_V2':
         loss_fn = TripletBatchHardV2Loss(margin1=(-1.0*margin),
                                          margin2=(margin1/100.0),
                                          beta=0.002,
                                          distance_metric=distance_metric)
-        loss_args = {'margin1':(-1.0*margin), 'margin2':(-1.0*margin)/100.0, 'beta':0.002, 'distance_metric':distance_metric}
         print('[INFO] Using batch-hard V2 strategy')
     elif triplet_strategy == 'ADAPTIVE':
         loss_fn = AdaptiveTripletLoss(margin=margin,
                                       soft=soft,
                                       lambda_=sigma)
-        loss_args = {'margin':margin, 'soft':soft, 'lambda_':sigma}
         run_eagerly = True
         print('[INFO] Using Adaptive Triplet Loss')
     elif triplet_strategy == 'ASSORTED':
@@ -230,12 +225,10 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                       focal=soft,
                                       sigma=sigma,
                                       distance_metric=distance_metric)
-        loss_args = {'margin':margin, 'focal':soft, 'sigma':sigma, 'distance_metric':distance_metric}
         print('[INFO] Using assorted triplet loss')
     elif triplet_strategy == 'CONSTELLATION':
         loss_fn = ConstellationLoss(k=int(margin) if margin > 1 else 4,
                                     batch_size=batch_size)
-        loss_args = {'k':int(margin) if margin > 1 else 4, 'batch_size':batch_size}
     elif triplet_strategy == 'MULTISIMILARITY':
         if distance_metric == 'L2':
             dist = 'euclidean'
@@ -248,25 +241,21 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                       beta=20,
                                       epsilon=margin,
                                       lmda=sigma if sigma < 1 else 0.5)
-        loss_args = {'distance':dist, 'alpha':1.0, 'beta':20, 'epsilon':margin, 'lmda':sigma if sigma < 1 else 0.5}
     elif triplet_strategy == 'HAP2S_E':
         loss_fn = HAP2S_ELoss(margin=margin,
                               soft=soft,
                               sigma=sigma,
                               distance_metric=distance_metric)
-        loss_args = {'margin':margin, 'soft':soft, 'sigma':sigma, 'distance_metric':distance_metric}
     elif triplet_strategy == 'HAP2S_P':
         loss_fn = HAP2S_PLoss(margin=margin,
                               soft=soft,
                               alpha=sigma,
                               distance_metric=distance_metric)
-        loss_args = {'margin':margin, 'soft':soft, 'alpha':sigma, 'distance_metric':distance_metric}
     else:
         loss_fn = TripletFocalLoss(margin=margin,
                                    sigma=sigma,
                                    soft=soft,
                                    distance_metric=distance_metric)
-        loss_args = {'margin':margin, 'soft':soft, 'sigma':sigma, 'distance_metric':distance_metric}
         print('[INFO] Using triplet focal loss.')
 
     if decay_margin_rate > 0 and triplet_strategy != 'BATCH_HARD_V2':
@@ -305,8 +294,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                                            recompile=recompile,
                                                            input_shape=[crop_size, crop_size, 3],
                                                            use_imagenet=use_imagenet,
-                                                           sam_type=sam_type,
-                                                           loss_args=loss_args)
+                                                           sam_type=sam_type)
                 assert model is not None, '[ERROR] There was a problem while loading the pre-trained weights'
                 if compiled is False:
                     print('[INFO] Recompiling model using passed optimizer and loss arguments')
@@ -324,8 +312,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                                            recompile=recompile,
                                                            input_shape=[crop_size, crop_size, 3],
                                                            use_imagenet=use_imagenet,
-                                                           sam_type=sam_type,
-                                                           loss_args=loss_args)
+                                                           sam_type=sam_type)
                 opt = get_optimizer(optimizer_name=optimizer,
                                     lr_schedule=1e-5,
                                     weight_decay=weight_decay) # Optimizer must be created within scope!
@@ -345,8 +332,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                                        recompile=recompile,
                                                        input_shape=[crop_size, crop_size, 3],
                                                        use_imagenet=use_imagenet,
-                                                       sam_type=sam_type,
-                                                       loss_args=loss_args)
+                                                       sam_type=sam_type)
             assert model is not None, '[ERROR] There was a problem while loading the pre-trained weights'
             if compiled is False:
                 print('[INFO] Recompiling model using passed optimizer and loss arguments')
@@ -401,8 +387,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                                            recompile=recompile,
                                                            input_shape=[crop_size, crop_size, 3],
                                                            use_imagenet=use_imagenet,
-                                                           sam_type=sam_type,
-                                                           loss_args=loss_args)
+                                                           sam_type=sam_type)
                 assert model is not None, '[ERROR] There was a problem in loading the pre-trained weights'
                 if compiled is False:
                     print('[INFO] Recompiling model using passed optimizer and loss arguments')
@@ -420,8 +405,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                                            recompile=recompile,
                                                            input_shape=[crop_size, crop_size, 3],
                                                            use_imagenet=use_imagenet,
-                                                           sam_type=sam_type,
-                                                           loss_args=loss_args)
+                                                           sam_type=sam_type)
                 opt = get_optimizer(optimizer_name=optimizer,
                                     lr_schedule=lr_schedule if lr_schedule_name not in ['triangular2', 'triangular'] else init_lr,
                                     weight_decay=weight_decay) # Optimizer must be created within scope!
@@ -441,8 +425,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                                        recompile=recompile,
                                                        input_shape=[crop_size, crop_size, 3],
                                                        use_imagenet=use_imagenet,
-                                                       sam_type=sam_type,
-                                                       loss_args=loss_args)
+                                                       sam_type=sam_type)
             assert model is not None, '[ERROR] There was a problem in loading the pre-trained weights'
             if compiled is False:
                 print('[INFO] Recompiling model using passed optimizer and loss arguments')
