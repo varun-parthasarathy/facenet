@@ -347,7 +347,7 @@ if __name__ == '__main__':
                                  'efficientnetv2-b2', 'efficientnetv2-b3', 'efficientnetv2-t'],
                         help='NN architecture to use. Default is EfficientNet-B2')
     parser.add_argument('--loss_type', type=str, default='FOCAL',
-                        choices=['VANILLA', 'BATCH_HARD', 'BATCH_HARD_V2', 'FOCAL', 'ADAPTIVE', 'ASSORTED', 'CONSTELLATION', 'MULTISIMILARITY'],
+                        choices=['VANILLA', 'BATCH_HARD', 'BATCH_HARD_V2', 'FOCAL', 'ADAPTIVE', 'ASSORTED', 'CONSTELLATION', 'MULTISIMILARITY', 'HAP2S_E', 'HAP2S_P'],
                         help='Choice of triplet loss formulation. Default is FOCAL')
     parser.add_argument('--load_from_file', action='store_true',
                         help='Load embeddings and labels from file instead of running inference again')

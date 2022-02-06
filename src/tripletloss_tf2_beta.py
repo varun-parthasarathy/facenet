@@ -549,7 +549,7 @@ if __name__ == '__main__':
     parser.add_argument('--equisample', action='store_true',
                         help='Determines whether to sample images from each class equally to form a batch. Will have performance drawbacks if enabled')
     parser.add_argument('--loss_to_load', type=str, default='FOCAL',
-                        choices=['VANILLA', 'BATCH_HARD', 'BATCH_HARD_V2', 'FOCAL', 'ADAPTIVE', 'ASSORTED', 'CONSTELLATION', 'MULTISIMILARITY'],
+                        choices=['VANILLA', 'BATCH_HARD', 'BATCH_HARD_V2', 'FOCAL', 'ADAPTIVE', 'ASSORTED', 'CONSTELLATION', 'MULTISIMILARITY', 'HAP2S_E', 'HAP2S_P'],
                         help='Choice of triplet loss object for loading models. Default is FOCAL')
     parser.add_argument('--use_imagenet', action='store_true',
                         help='Use pre-trained ImageNet weights')
