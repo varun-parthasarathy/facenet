@@ -159,19 +159,19 @@ def create_neural_network_v2(model_type='resnet50', embedding_size=512, input_sh
         #             tf.keras.layers.Dropout(rate=0.3),
         #             MetricEmbedding(embedding_size)
         #         ])
-        base_model = get_efficientnetv2_model(model_type=model_type,
-                                              input_shape=input_shape,
-                                              num_classes=0, # Must always be 0
-                                              pretrained=weights)
-        base_output = base_model.output # NOT "outputs"! Should be singular!
-        droput_layer = tf.keras.layers.Dropout(rate=0.3)(base_output)
-        embeddings = MetricEmbedding(embedding_size)(droput_layer)
+        model = get_efficientnetv2_model(model_type=model_type,
+                                         input_shape=input_shape,
+                                         num_classes=0, # Must always be 0
+                                         pretrained=weights)
+        #base_output = model.output # NOT "outputs"! Should be singular!
+        dropout_layer = tf.keras.layers.Dropout(rate=0.3)(model.output) # NOT "outputs"! Should be singular!
+        embeddings = MetricEmbedding(embedding_size)(dropout_layer)
         if sam_type == 'SAM':
-            model = SAMModel(inputs=base_model.input, outputs=embeddings)
+            model = SAMModel(inputs=model.input, outputs=embeddings)
         elif sam_type == 'ESAM':
-            model = ESAMModel(inputs=base_model.input, outputs=embeddings)
+            model = ESAMModel(inputs=model.input, outputs=embeddings)
         else:
-            model = Model(inputs=base_model.input, outputs=embeddings)
+            model = Model(inputs=model.input, outputs=embeddings)
 
     else:
         inputs = Input(input_shape, name='image_input')
