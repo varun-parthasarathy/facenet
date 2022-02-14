@@ -73,7 +73,7 @@ def get_learning_rate_schedule(schedule_name, image_count, batch_size, learning_
 
     return lr
 
-def get_optimizer(optimizer_name, lr_schedule, weight_decay=1e-6):
+def get_optimizer(optimizer_name, lr_schedule, weight_decay=1e-6, sam_type='null'):
     assert lr_schedule is not None, '[ERROR] Learning rate schedule is required'
     opt = None
     if optimizer_name == 'RMSPROP':
