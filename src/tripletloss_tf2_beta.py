@@ -28,7 +28,7 @@ from cyclic_learning_rate import CyclicLR
 
 
 def get_learning_rate_schedule(schedule_name, image_count, batch_size, learning_rate=1e-3, max_lr=0.25,
-                               step_size=30000, sam_type='null'):
+                               step_size=30000, sam_type):
     lr = None
     if schedule_name == 'triangular2':
         # lr = tfa.optimizers.Triangular2CyclicalLearningRate(initial_learning_rate=learning_rate,
