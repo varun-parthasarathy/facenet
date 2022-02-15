@@ -4,7 +4,7 @@ import copy
 
 
 class SAMModel(tf.keras.Model):
-    def __init__(self, base_model, rho=0.05, **kwargs):
+    def __init__(self, rho=0.05, **kwargs):
         super(SAMModel, self).__init__(**kwargs)
         self.rho = rho
 
@@ -26,7 +26,7 @@ class SAMModel(tf.keras.Model):
             e_ws.append(e_w)
 
         with tf.GradientTape() as tape:
-            predictions = self.base_model(images, training=True)
+            predictions = self(images, training=True)
             loss = self.compiled_loss(labels, predictions)    
         
         sam_gradients = tape.gradient(loss, self.trainable_variables)
@@ -41,7 +41,7 @@ class SAMModel(tf.keras.Model):
 
     def test_step(self, data):
         (images, labels) = data
-        predictions = self.base_model(images, training=False)
+        predictions = self(images, training=False)
         loss = self.compiled_loss(labels, predictions)
         self.compiled_metrics.update_state(labels, predictions)
         return {m.name: m.result() for m in self.metrics}
@@ -110,17 +110,14 @@ class ESAMModel(tf.keras.Model):
             loss = self.compiled_loss(tf.gather(labels, indices), predictions)
         
         sam_gradients = tape.gradient(loss, self.trainable_variables)
-        new_grads = []
-        new_vars = []
+
         for i, (param, e_w, g) in enumerate(zip(self.trainable_variables, e_ws, sam_gradients)):
             param.assign_sub(e_w)
-            if random.random() > self.beta:
-                pass
-            else:
-                new_grads.append(g)
-                new_vars.append(param)
+            sam_gradients[i] = tf.cond(tf.random.uniform(shape=[], minval=0., maxval=1.) > self.beta, 
+                                       lambda: tf.zeros_like(sam_gradients[i]),
+                                       lambda: sam_gradients[i])
 
-        self.optimizer.apply_gradients(zip(new_grads, new_vars))
+        self.optimizer.apply_gradients(zip(sam_gradients, self.trainable_variables))
         
         self.compiled_metrics.update_state(labels, predictions)
         return {m.name: m.result() for m in self.metrics}
