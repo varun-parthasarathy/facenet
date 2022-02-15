@@ -28,7 +28,7 @@ from cyclic_learning_rate import CyclicLR
 
 
 def get_learning_rate_schedule(schedule_name, image_count, batch_size, learning_rate=1e-3, max_lr=0.25,
-                               step_size=30000, sam_type):
+                               step_size=30000):
     lr = None
     if schedule_name == 'triangular2':
         # lr = tfa.optimizers.Triangular2CyclicalLearningRate(initial_learning_rate=learning_rate,
@@ -81,75 +81,48 @@ def get_optimizer(optimizer_name, lr_schedule, weight_decay=1e-6):
                                           momentum=0.9,
                                           centered=True)
     elif optimizer_name == 'SGDW':
-        if sam_type in ['SAM', 'ESAM']:
-            opt = tf.keras.optimizers.SGD(learning_rate=lr_schedule,
-                                          momentum=0.9,
-                                          nesterov=True)
-            print('[WARNING] SAM and ESAM do not work with decoupled weight decay or Lookahead as of now. Using base optimizer instead')
-        else:
-            opt = tfa.optimizers.SGDW(learning_rate=lr_schedule,
-                                      weight_decay=weight_decay,
-                                      momentum=0.9,
-                                      nesterov=True)
+        opt = tfa.optimizers.SGDW(learning_rate=lr_schedule,
+                                  weight_decay=weight_decay,
+                                  momentum=0.9,
+                                  nesterov=True)
     elif optimizer_name == 'ADAM':
-        if sam_type in ['SAM', 'ESAM']:
-            opt = tf.keras.optimizers.Adam(learning_rate=lr_schedule,
-                                           amsgrad=True)
-            print('[WARNING] SAM and ESAM do not work with decoupled weight decay or Lookahead as of now. Using base optimizer instead')
-        else:
-            opt = tfa.optimizers.AdamW(learning_rate=lr_schedule,
-                                       weight_decay=weight_decay,
-                                       amsgrad=True)                    # Needs to be tested further
+        opt = tfa.optimizers.AdamW(learning_rate=lr_schedule,
+                                   weight_decay=weight_decay,
+                                   amsgrad=True)                    # Needs to be tested further
     elif optimizer_name == 'ADAGRAD':
         opt = tf.keras.optimizers.Adagrad(learning_rate=lr_schedule)
     elif optimizer_name == 'ADADELTA':
         opt = tf.keras.optimizers.Adadelta(learning_rate=lr_schedule)
     elif optimizer_name == 'LOOKAHEAD_ADAM':
-        if sam_type in ['SAM', 'ESAM']:
-            opt = tf.keras.optimizers.Adam(learning_rate=lr_schedule,
-                                           amsgrad=True)
-            print('[WARNING] SAM and ESAM do not work with decoupled weight decay or Lookahead as of now. Using base optimizer instead')
-        else:
-            base_opt = tfa.optimizers.AdamW(learning_rate=lr_schedule,
-                                            weight_decay=weight_decay,
-                                            amsgrad=True)
-            opt = tfa.optimizers.Lookahead(optimizer=base_opt,
-                                           sync_period=8,
-                                           slow_step_size=0.5)
+        base_opt = tfa.optimizers.AdamW(learning_rate=lr_schedule,
+                                        weight_decay=weight_decay,
+                                        amsgrad=True)
+        opt = tfa.optimizers.Lookahead(optimizer=base_opt,
+                                       sync_period=8,
+                                       slow_step_size=0.5)
     elif optimizer_name == 'LOOKAHEAD_SGD':
-        if sam_type in ['SAM', 'ESAM']:
-            opt = tf.keras.optimizers.SGD(learning_rate=lr_schedule,
-                                          momentum=0.9,
-                                          nesterov=True)
-            print('[WARNING] SAM and ESAM do not work with decoupled weight decay or Lookahead as of now. Using base optimizer instead')
-        else:
-            base_opt = tfa.optimizers.SGDW(learning_rate=lr_schedule,
-                                           weight_decay=weight_decay,
-                                           momentum=0.9,
-                                           nesterov=True)
-            opt = tfa.optimizers.Lookahead(optimizer=base_opt,
-                                           sync_period=8,
-                                           slow_step_size=0.5)
+        base_opt = tfa.optimizers.SGDW(learning_rate=lr_schedule,
+                                       weight_decay=weight_decay,
+                                       momentum=0.9,
+                                       nesterov=True)
+        opt = tfa.optimizers.Lookahead(optimizer=base_opt,
+                                       sync_period=8,
+                                       slow_step_size=0.5)
     elif optimizer_name == 'RANGER':
         min_lr = None
         if isinstance(lr_schedule, float):
             min_lr = max(lr_schedule/100., 1e-4)
         else:
             min_lr = 1e-4
-        if sam_type in ['SAM', 'ESAM']:
-            opt = tf.keras.optimizers.Adam(learning_rate=lr_schedule,
-                                           amsgrad=True)
-            print('[WARNING] SAM and ESAM do not work with decoupled weight decay or Lookahead as of now. Using base optimizer instead')
-        else:
-            base_opt = tfa.optimizers.RectifiedAdam(learning_rate=lr_schedule,
-                                                    weight_decay=weight_decay,
-                                                    total_steps=5000,
-                                                    warmup_proportion=0.1,
-                                                    min_lr=min_lr,
-                                                    amsgrad=False)
-            opt = tfa.optimizers.Lookahead(optimizer=base_opt,
-                                           sync_period=8,
-                                           slow_step_size=0.5)
+        base_opt = tfa.optimizers.RectifiedAdam(learning_rate=lr_schedule,
+                                                weight_decay=weight_decay,
+                                                total_steps=5000,
+                                                warmup_proportion=0.1,
+                                                min_lr=min_lr,
+                                                amsgrad=False)
+        opt = tfa.optimizers.Lookahead(optimizer=base_opt,
+                                       sync_period=8,
+                                       slow_step_size=0.5)
     else:
         pass
 
@@ -310,8 +283,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                          batch_size=batch_size)
         opt = get_optimizer(optimizer_name=optimizer,
                             lr_schedule=1e-5,
-                            weight_decay=weight_decay,
-                            sam_type=sam_type)
+                            weight_decay=weight_decay)
         if use_tpu is True:
             with strategy.scope():
                 model, compiled = create_neural_network_v2(model_type=model_type,
@@ -343,8 +315,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                                            sam_type=sam_type)
                 opt = get_optimizer(optimizer_name=optimizer,
                                     lr_schedule=1e-5,
-                                    weight_decay=weight_decay,
-                                    sam_type=sam_type) # Optimizer must be created within scope!
+                                    weight_decay=weight_decay) # Optimizer must be created within scope!
                 assert model is not None, '[ERROR] There was a problem while loading the pre-trained weights'
                 if compiled is False:
                     print('[INFO] Recompiling model using passed optimizer and loss arguments')
@@ -392,8 +363,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                                  step_size=step_size)
         opt = get_optimizer(optimizer_name=optimizer,
                             lr_schedule=lr_schedule if lr_schedule_name not in ['triangular2', 'triangular'] else init_lr,
-                            weight_decay=weight_decay,
-                            sam_type=sam_type)
+                            weight_decay=weight_decay)
 
         if not os.path.exists(checkpoint_path):
             os.mkdir(checkpoint_path)
@@ -438,8 +408,7 @@ def train_model(data_path, batch_size, image_size, crop_size, lr_schedule_name, 
                                                            sam_type=sam_type)
                 opt = get_optimizer(optimizer_name=optimizer,
                                     lr_schedule=lr_schedule if lr_schedule_name not in ['triangular2', 'triangular'] else init_lr,
-                                    weight_decay=weight_decay,
-                                    sam_type=sam_type) # Optimizer must be created within scope!
+                                    weight_decay=weight_decay) # Optimizer must be created within scope!
                 assert model is not None, '[ERROR] There was a problem in loading the pre-trained weights'
                 if compiled is False:
                     print('[INFO] Recompiling model using passed optimizer and loss arguments')

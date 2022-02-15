@@ -110,21 +110,17 @@ class ESAMModel(tf.keras.Model):
             loss = self.compiled_loss(tf.gather(labels, indices), predictions)
         
         sam_gradients = tape.gradient(loss, self.trainable_variables)
-        # new_grads = []
-        # new_vars = []
-        new_indices = []
+        new_grads = []
+        new_vars = []
         for i, (param, e_w, g) in enumerate(zip(self.trainable_variables, e_ws, sam_gradients)):
             param.assign_sub(e_w)
             if random.random() > self.beta:
                 pass
             else:
-                new_indices.append(i)
-                # new_grads.append(g)
-                # new_vars.append(param)
+                new_grads.append(g)
+                new_vars.append(param)
 
-        # self.optimizer.apply_gradients(zip(new_grads, new_vars))
-        self.optimizer.apply_gradients(
-            zip([sam_gradients[i] for i in new_indices], [self.trainable_variables[i] for i in new_indices]))
+        self.optimizer.apply_gradients(zip(new_grads, new_vars))
         
         self.compiled_metrics.update_state(labels, predictions)
         return {m.name: m.result() for m in self.metrics}
